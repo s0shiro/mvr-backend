@@ -6,7 +6,7 @@ use App\Http\Controllers\AuthController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
-})->middleware('auth:api');
+})->middleware(['auth:api','role:admin|customer']);
 
 // Auth routes
 Route::controller(AuthController::class)->group(function () {
