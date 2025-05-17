@@ -11,10 +11,14 @@ class AssignRolesToUsersSeeder extends Seeder
     public function run(): void
     {
         // Assign roles to example users (customize as needed)
-        $adminUser = User::where('email', 'admin@example.com')->first();
-        if ($adminUser) {   
-            $adminUser->assignRole('admin');
-        }
+        $adminUser = User::firstOrCreate([
+            'email' => 'admin@gmail.com',
+        ], [
+            'username' => 'admin',
+            'name' => 'Admin User',
+            'password' => bcrypt('password'),
+        ]);
+        $adminUser->assignRole('admin');
 
         // Example: create and assign a manager
         $managerUser = User::firstOrCreate([
