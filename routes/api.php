@@ -21,7 +21,7 @@ Route::controller(AuthController::class)->group(function () {
 // Vehicle routes
 Route::controller(VehicleController::class)->group(function () {
     // Routes accessible to both admin and customer
-    Route::middleware(['auth:api', 'role:admin|customer'])->group(function () {
+    Route::middleware(['auth:api', 'role:admin|customer|manager'])->group(function () {
         Route::get('/vehicles', 'index');
         Route::get('/vehicles/{vehicle}', 'show');
         Route::get('/vehicles/{vehicle}/images/{imageId}', 'getImage');
