@@ -81,10 +81,22 @@ class VehicleController extends Controller
     public function show(int $id): JsonResponse
     {
         $vehicle = $this->vehicleService->getVehicleById($id);
+        // Eager load images
+        $vehicle->load(['images']);
+
+        // Attach image_url to each image
+        $images = $vehicle->images->map(function ($img) {
+            return array_merge($img->toArray(), [
+                'image_url' => $img->image_url,
+            ]);
+        });
+
+        $vehicleArray = $vehicle->toArray();
+        $vehicleArray['images'] = $images;
 
         return response()->json([
             'status' => 'success',
-            'data' => $vehicle
+            'data' => $vehicleArray
         ]);
     }
 
