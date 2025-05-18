@@ -46,4 +46,34 @@ class Vehicle extends Model
     {
         return $this->hasMany(Booking::class);
     }
+
+    /**
+     * Get all images for this vehicle
+     */
+    public function images()
+    {
+        return $this->hasMany(VehicleImage::class)->orderBy('sort_order');
+    }
+
+    /**
+     * Get the primary image for this vehicle
+     */
+    public function primaryImage()
+    {
+        return $this->hasOne(VehicleImage::class)->where('is_primary', true);
+    }
+
+    /**
+     * Append primary image URL to the vehicle data
+     */
+    protected $appends = ['primary_image_url'];
+
+    /**
+     * Get the primary image URL
+     */
+    public function getPrimaryImageUrlAttribute()
+    {
+        $primaryImage = $this->primaryImage;
+        return $primaryImage ? $primaryImage->image_url : null;
+    }
 }

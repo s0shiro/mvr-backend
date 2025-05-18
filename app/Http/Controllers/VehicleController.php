@@ -145,4 +145,90 @@ class VehicleController extends Controller
             'data' => $vehicle->fresh()
         ]);
     }
+
+    /**
+     * Upload base64 images for a vehicle
+     */
+    public function uploadImages(Request $request, Vehicle $vehicle): JsonResponse
+    {
+        $request->validate([
+            'images' => 'required|array',
+            'images.*' => ['required', 'string', 'regex:/^data:image\/(jpeg|png|jpg|gif);base64,/']
+        ]);
+
+        $this->vehicleService->addVehicleImages($vehicle, $request->images);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Images uploaded successfully',
+            'data' => $vehicle->load(['images' => function($query) {
+                $query->select('id', 'vehicle_id', 'mime_type', 'is_primary', 'sort_order');
+            }])
+        ]);
+    }
+
+    /**
+     * Delete an image from a vehicle
+     */
+    public function deleteImage(Vehicle $vehicle, int $imageId): JsonResponse
+    {
+        $this->vehicleService->removeVehicleImage($vehicle, $imageId);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Image deleted successfully'
+        ]);
+    }
+
+    /**
+     * Set primary image for a vehicle
+     */
+    public function setPrimaryImage(Vehicle $vehicle, int $imageId): JsonResponse
+    {
+        $this->vehicleService->setVehiclePrimaryImage($vehicle, $imageId);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Primary image set successfully',
+            'data' => $vehicle->load(['images' => function($query) {
+                $query->select('id', 'vehicle_id', 'mime_type', 'is_primary', 'sort_order');
+            }])
+        ]);
+    }
+
+    /**
+     * Get a specific image by ID
+     */
+    public function getImage(Vehicle $vehicle, int $imageId): JsonResponse
+    {
+        $image = $vehicle->images()->findOrFail($imageId);
+        
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'image_url' => $image->image_url
+            ]
+        ]);
+    }
+
+    /**
+     * Reorder vehicle images
+     */
+    public function reorderImages(Request $request, Vehicle $vehicle): JsonResponse
+    {
+        $request->validate([
+            'image_ids' => 'required|array',
+            'image_ids.*' => 'required|integer|exists:vehicle_images,id'
+        ]);
+
+        $this->vehicleService->reorderVehicleImages($vehicle, $request->image_ids);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Images reordered successfully',
+            'data' => $vehicle->load(['images' => function($query) {
+                $query->select('id', 'vehicle_id', 'mime_type', 'is_primary', 'sort_order');
+            }])
+        ]);
+    }
 }

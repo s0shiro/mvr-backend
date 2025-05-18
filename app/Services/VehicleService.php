@@ -100,4 +100,50 @@ class VehicleService
     {
         return $vehicle->update(['status' => $status]);
     }
+
+    /**
+     * Add base64 images to a vehicle
+     */
+    public function addVehicleImages(Vehicle $vehicle, array $images, bool $setPrimary = true): void
+    {
+        foreach ($images as $index => $imageData) {
+            // Get mime type and base64 data from data URL
+            if (preg_match('/^data:(.*?);base64,(.*)$/', $imageData, $matches)) {
+                $vehicle->images()->create([
+                    'mime_type' => $matches[1],
+                    'image_data' => $matches[2],
+                    'is_primary' => $setPrimary && $index === 0,
+                    'sort_order' => $index
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Remove an image from a vehicle
+     */
+    public function removeVehicleImage(Vehicle $vehicle, int $imageId): bool
+    {
+        return $vehicle->images()->where('id', $imageId)->delete();
+    }
+
+    /**
+     * Set an image as primary
+     */
+    public function setVehiclePrimaryImage(Vehicle $vehicle, int $imageId): bool
+    {
+        $vehicle->images()->update(['is_primary' => false]);
+        return $vehicle->images()->findOrFail($imageId)->update(['is_primary' => true]);
+    }
+
+    /**
+     * Reorder vehicle images
+     */
+    public function reorderVehicleImages(Vehicle $vehicle, array $imageIds): bool
+    {
+        foreach ($imageIds as $index => $imageId) {
+            $vehicle->images()->where('id', $imageId)->update(['sort_order' => $index]);
+        }
+        return true;
+    }
 }

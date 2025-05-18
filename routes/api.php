@@ -24,6 +24,7 @@ Route::controller(VehicleController::class)->group(function () {
     Route::middleware(['auth:api', 'role:admin|customer'])->group(function () {
         Route::get('/vehicles', 'index');
         Route::get('/vehicles/{vehicle}', 'show');
+        Route::get('/vehicles/{vehicle}/images/{imageId}', 'getImage');
     });
 
     // Routes accessible to admin only
@@ -32,5 +33,11 @@ Route::controller(VehicleController::class)->group(function () {
         Route::put('/vehicles/{vehicle}', 'update');
         Route::delete('/vehicles/{vehicle}', 'destroy');
         Route::patch('/vehicles/{vehicle}/status', 'updateStatus');
+        
+        // Image management routes
+        Route::post('/vehicles/{vehicle}/images', 'uploadImages');
+        Route::delete('/vehicles/{vehicle}/images/{imageId}', 'deleteImage');
+        Route::put('/vehicles/{vehicle}/images/{imageId}/primary', 'setPrimaryImage');
+        Route::put('/vehicles/{vehicle}/images/reorder', 'reorderImages');
     });
 });
