@@ -4,6 +4,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\BookingController;
+use App\Http\Controllers\PaymentController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -40,4 +42,21 @@ Route::controller(VehicleController::class)->group(function () {
         Route::put('/vehicles/{vehicle}/images/{imageId}/primary', 'setPrimaryImage');
         Route::put('/vehicles/{vehicle}/images/reorder', 'reorderImages');
     });
+});
+
+// Booking routes
+Route::controller(BookingController::class)->middleware(['auth:api', 'role:admin|customer|manager'])->group(function () {
+    Route::post('/bookings/summary', 'summary'); // Get booking summary (availability, price)
+    Route::post('/bookings', 'store'); // Create booking
+    Route::put('/bookings/{booking}', 'update'); // Modify booking (FR006)
+    Route::post('/bookings/{booking}/cancel', 'cancel'); // Cancel booking (FR007)
+    Route::get('/mybookings', 'myBookings'); // List bookings for the authenticated user
+});
+
+// Payment routes
+Route::get('/payment-methods', [PaymentController::class, 'methods']);
+Route::controller(PaymentController::class)->middleware(['auth:api', 'role:admin|customer|manager'])->group(function () {
+    Route::post('/bookings/{booking}/payment', 'store'); // Customer submits payment
+    Route::get('/bookings/{booking}/payment', 'show'); // View payment info
+    Route::patch('/bookings/{booking}/payment/status', 'updateStatus'); // Admin updates payment status
 });

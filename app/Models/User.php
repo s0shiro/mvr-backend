@@ -8,6 +8,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 use Spatie\Permission\Traits\HasRoles;
+use App\Models\Booking;
 
 class User extends Authenticatable implements JWTSubject
 {
@@ -67,5 +68,10 @@ class User extends Authenticatable implements JWTSubject
     public function getRoleAttribute()
     {
         return $this->roles->first()?->name;
+    }
+
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class);
     }
 }
