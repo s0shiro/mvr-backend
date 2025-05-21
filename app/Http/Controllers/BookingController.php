@@ -54,7 +54,7 @@ class BookingController extends Controller
             'start_date' => 'required|date|after:now',
             'end_date' => 'required|date|after:start_date',
         ]);
-        $available = !$this->bookingService->isAvailable(
+        $hasConflict = $this->bookingService->isAvailable(
             $validated['vehicle_id'],
             $validated['start_date'],
             $validated['end_date']
@@ -62,7 +62,7 @@ class BookingController extends Controller
         $vehicle = \App\Models\Vehicle::findOrFail($validated['vehicle_id']);
         $price = $this->bookingService->calculatePrice($vehicle, $validated['start_date'], $validated['end_date']);
         return response()->json([
-            'available' => $available,
+            'available' => !$hasConflict,
             'total_price' => $price,
         ]);
     }
@@ -91,7 +91,7 @@ class BookingController extends Controller
         $startDate = $validated['start_date'] ?? $booking->start_date;
         $endDate = $validated['end_date'] ?? $booking->end_date;
         $service = app(BookingService::class);
-        if (!$service->isAvailable($vehicleId, $startDate, $endDate, $booking->id)) {
+        if ($service->isAvailable($vehicleId, $startDate, $endDate, $booking->id)) {
             return response()->json(['message' => 'Vehicle not available for selected dates'], 409);
         }
         $booking->update(array_merge($validated, [
