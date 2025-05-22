@@ -20,7 +20,8 @@ return new class extends Migration
             $table->integer('year');
             $table->string('plate_number')->unique();
             $table->integer('capacity'); // number of passengers
-            $table->decimal('rental_rate', 10, 2); // per day
+            $table->decimal('rental_rate', 10, 2); // per day without driver
+            $table->decimal('rental_rate_with_driver', 10, 2); // per day with driver
             $table->text('description')->nullable();
             $table->string('status')->default('available'); // available, maintenance, rented
             $table->timestamps();

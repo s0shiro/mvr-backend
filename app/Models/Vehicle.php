@@ -25,6 +25,7 @@ class Vehicle extends Model
         'plate_number',
         'capacity',
         'rental_rate',
+        'rental_rate_with_driver',
         'description',
         'status',
     ];

@@ -33,32 +33,49 @@ class BookingService
     /**
      * Create a booking if available.
      */
-    public function createBooking($userId, $vehicleId, $startDate, $endDate, $notes = null)
+    public function createBooking($userId, $vehicleId, $startDate, $endDate, $notes = null, $driverRequested = false, $pickupType = 'pickup', $deliveryLocation = null, $deliveryDetails = null)
     {
         if ($this->isAvailable($vehicleId, $startDate, $endDate)) {
             return null; // Not available
         }
         $vehicle = Vehicle::findOrFail($vehicleId);
-        $totalPrice = $this->calculatePrice($vehicle, $startDate, $endDate);
+        
+        // Calculate delivery fee if applicable
+        $deliveryFee = 0;
+        if ($pickupType === 'delivery' && $deliveryLocation) {
+            $deliveryFee = Booking::DELIVERY_FEES[$deliveryLocation] ?? 0;
+        }
+
+        $totalPrice = $this->calculatePrice($vehicle, $startDate, $endDate, $driverRequested);
+        
         return Booking::create([
             'user_id' => $userId,
             'vehicle_id' => $vehicleId,
             'start_date' => $startDate,
             'end_date' => $endDate,
             'status' => 'pending',
-            'total_price' => $totalPrice,
+            'total_price' => $totalPrice + $deliveryFee,
             'notes' => $notes,
+            'driver_requested' => $driverRequested,
+            'pickup_type' => $pickupType,
+            'delivery_location' => $deliveryLocation,
+            'delivery_details' => $deliveryDetails,
+            'delivery_fee' => $deliveryFee,
         ]);
     }
 
     /**
      * Calculate price for the booking.
      */
-    public function calculatePrice($vehicle, $startDate, $endDate)
+    public function calculatePrice($vehicle, $startDate, $endDate, $driverRequested = false)
     {
         $start = Carbon::parse($startDate);
         $end = Carbon::parse($endDate);
         $days = $start->diffInDays($end) ?: 1;
-        return $vehicle->rental_rate * $days;
+        
+        // Use the appropriate rate based on whether a driver is requested
+        $rate = $driverRequested ? $vehicle->rental_rate_with_driver : $vehicle->rental_rate;
+        
+        return $rate * $days;
     }
 }

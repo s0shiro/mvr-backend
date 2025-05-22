@@ -26,6 +26,10 @@ class BookingController extends Controller
             'start_date' => 'required|date|after:now',
             'end_date' => 'required|date|after:start_date',
             'notes' => 'nullable|string',
+            'driver_requested' => 'boolean',
+            'pickup_type' => 'required|in:pickup,delivery',
+            'delivery_location' => 'sometimes|required_if:pickup_type,delivery|string|in:' . implode(',', array_keys(Booking::DELIVERY_FEES)),
+            'delivery_details' => 'sometimes|required_if:pickup_type,delivery|string|max:500',
         ]);
         $userId = Auth::id();
         if (!$userId) {
@@ -36,7 +40,11 @@ class BookingController extends Controller
             $validated['vehicle_id'],
             $validated['start_date'],
             $validated['end_date'],
-            $validated['notes'] ?? null
+            $validated['notes'] ?? null,
+            $validated['driver_requested'] ?? false,
+            $validated['pickup_type'] ?? 'pickup',
+            $validated['delivery_location'] ?? null,
+            $validated['delivery_details'] ?? null
         );
         if (!$booking) {
             return response()->json(['message' => 'Vehicle not available for selected dates'], 409);
@@ -53,6 +61,7 @@ class BookingController extends Controller
             'vehicle_id' => 'required|exists:vehicles,id',
             'start_date' => 'required|date|after:now',
             'end_date' => 'required|date|after:start_date',
+            'driver_requested' => 'boolean',
         ]);
         $hasConflict = $this->bookingService->isAvailable(
             $validated['vehicle_id'],
@@ -60,10 +69,36 @@ class BookingController extends Controller
             $validated['end_date']
         );
         $vehicle = \App\Models\Vehicle::findOrFail($validated['vehicle_id']);
-        $price = $this->bookingService->calculatePrice($vehicle, $validated['start_date'], $validated['end_date']);
+        $driverRequested = $validated['driver_requested'] ?? false;
+        $price = $this->bookingService->calculatePrice(
+            $vehicle, 
+            $validated['start_date'], 
+            $validated['end_date'],
+            $driverRequested
+        );
+
+        // Calculate delivery fee if applicable
+        $deliveryFee = 0;
+        if ($request->input('pickup_type') === 'delivery' && $request->input('delivery_location')) {
+            $deliveryFee = Booking::DELIVERY_FEES[$request->input('delivery_location')] ?? 0;
+        }
+
         return response()->json([
             'available' => !$hasConflict,
-            'total_price' => $price,
+            'total_price' => $price + $deliveryFee,
+            'rental_rate' => $driverRequested ? $vehicle->rental_rate_with_driver : $vehicle->rental_rate,
+            'with_driver' => $driverRequested,
+            'delivery_options' => [
+                'locations' => array_map(function($location, $fee) {
+                    return [
+                        'name' => $location,
+                        'fee' => $fee
+                    ];
+                }, array_keys(Booking::DELIVERY_FEES), array_values(Booking::DELIVERY_FEES)),
+                'delivery_fee' => $request->input('pickup_type') === 'delivery' 
+                    ? (Booking::DELIVERY_FEES[$request->input('delivery_location')] ?? 0)
+                    : 0,
+            ],
         ]);
     }
 
@@ -77,6 +112,9 @@ class BookingController extends Controller
             'start_date' => 'sometimes|date|after:now',
             'end_date' => 'sometimes|date|after:start_date',
             'notes' => 'nullable|string',
+            'pickup_type' => 'sometimes|in:pickup,delivery',
+            'delivery_location' => 'sometimes|required_if:pickup_type,delivery|string|in:' . implode(',', array_keys(Booking::DELIVERY_FEES)),
+            'delivery_details' => 'sometimes|required_if:pickup_type,delivery|string|max:500',
         ]);
         $userId = Auth::id();
         $booking = Booking::findOrFail($bookingId);
@@ -90,15 +128,25 @@ class BookingController extends Controller
         $vehicleId = $validated['vehicle_id'] ?? $booking->vehicle_id;
         $startDate = $validated['start_date'] ?? $booking->start_date;
         $endDate = $validated['end_date'] ?? $booking->end_date;
+        $pickupType = $validated['pickup_type'] ?? $booking->pickup_type;
+        $deliveryLocation = $validated['delivery_location'] ?? $booking->delivery_location;
+        $deliveryDetails = $validated['delivery_details'] ?? $booking->delivery_details;
         $service = app(BookingService::class);
         if ($service->isAvailable($vehicleId, $startDate, $endDate, $booking->id)) {
             return response()->json(['message' => 'Vehicle not available for selected dates'], 409);
         }
+        // Calculate delivery fee
+        $deliveryFee = $pickupType === 'delivery' ? (Booking::DELIVERY_FEES[$deliveryLocation] ?? 0) : 0;
+        
         $booking->update(array_merge($validated, [
             'vehicle_id' => $vehicleId,
             'start_date' => $startDate,
             'end_date' => $endDate,
-            'total_price' => $service->calculatePrice($booking->vehicle, $startDate, $endDate),
+            'pickup_type' => $pickupType,
+            'delivery_location' => $deliveryLocation,
+            'delivery_details' => $deliveryDetails,
+            'delivery_fee' => $deliveryFee,
+            'total_price' => $service->calculatePrice($booking->vehicle, $startDate, $endDate) + $deliveryFee,
         ]));
         return response()->json(['message' => 'Booking updated', 'booking' => $booking]);
     }

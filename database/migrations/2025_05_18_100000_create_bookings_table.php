@@ -16,6 +16,11 @@ return new class extends Migration {
             $table->enum('status', ['pending', 'confirmed', 'cancelled', 'completed'])->default('pending');
             $table->decimal('total_price', 10, 2)->nullable();
             $table->text('notes')->nullable();
+            $table->boolean('driver_requested')->default(false);
+            $table->enum('pickup_type', ['pickup', 'delivery'])->default('pickup');
+            $table->string('delivery_location')->nullable();
+            $table->text('delivery_details')->nullable()->comment('Barangay, landmark, and additional delivery instructions');
+            $table->decimal('delivery_fee', 10, 2)->nullable();
             $table->timestamps();
         });
     }

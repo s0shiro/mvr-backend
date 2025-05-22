@@ -62,6 +62,7 @@ class VehicleController extends Controller
             'plate_number' => 'required|string|unique:vehicles,plate_number|max:20',
             'capacity' => 'required|integer|min:1',
             'rental_rate' => 'required|numeric|min:0',
+            'rental_rate_with_driver' => 'required|numeric|min:0',
             'description' => 'nullable|string',
             'status' => 'required|string|in:available,maintenance,rented'
         ]);
@@ -114,6 +115,7 @@ class VehicleController extends Controller
             'plate_number' => 'sometimes|string|unique:vehicles,plate_number,' . $vehicle->id . '|max:20',
             'capacity' => 'sometimes|integer|min:1',
             'rental_rate' => 'sometimes|numeric|min:0',
+            'rental_rate_with_driver' => 'sometimes|numeric|min:0',
             'description' => 'nullable|string',
             'status' => 'sometimes|string|in:available,maintenance,rented'
         ]);

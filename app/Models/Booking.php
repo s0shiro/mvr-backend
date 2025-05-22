@@ -17,6 +17,24 @@ class Booking extends Model
         'status',
         'total_price',
         'notes',
+        'driver_requested',
+        'pickup_type',
+        'delivery_location',
+        'delivery_details',
+        'delivery_fee',
+    ];
+
+    const DELIVERY_FEES = [
+        'Boac' => 300,
+        'Gasan' => 300,
+        'Gasan Port' => 300,
+        'Balanacan' => 300,
+        'Buenavista' => 300, // Added default price
+        'Sta. Cruz' => 500,
+        'Sta. Cruz Port' => 500,
+        'Torrijos' => 700,
+        'Maniwaya' => 500,
+        'Mogpog' => 150,
     ];
 
     public function user()

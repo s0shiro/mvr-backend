@@ -39,7 +39,9 @@ class VehicleService
                 $q->whereRaw('LOWER(name) LIKE ?', ['%' . $search . '%'])
                   ->orWhereRaw('LOWER(brand) LIKE ?', ['%' . $search . '%'])
                   ->orWhereRaw('LOWER(model) LIKE ?', ['%' . $search . '%'])
-                  ->orWhereRaw('LOWER(plate_number) LIKE ?', ['%' . $search . '%']);
+                  ->orWhereRaw('LOWER(plate_number) LIKE ?', ['%' . $search . '%'])
+                  ->orWhereRaw('CAST(rental_rate AS TEXT) LIKE ?', ['%' . $search . '%'])
+                  ->orWhereRaw('CAST(rental_rate_with_driver AS TEXT) LIKE ?', ['%' . $search . '%']);
             });
         }
 
