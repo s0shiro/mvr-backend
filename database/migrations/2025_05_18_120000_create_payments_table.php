@@ -15,6 +15,7 @@ return new class extends Migration {
             $table->longText('proof_image'); // base64
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->enum('type', ['deposit', 'rental'])->default('deposit');
+            $table->timestamp('approved_at')->nullable();
             $table->timestamps();
         });
     }
