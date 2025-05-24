@@ -68,4 +68,7 @@ Route::middleware(['auth:api', 'role:admin'])->prefix('admin')->group(function (
     Route::post('/bookings/payments/{paymentId}/reject', [App\Http\Controllers\Admin\BookingController::class, 'rejectPayment']);
     Route::post('/bookings/{booking}/release', [App\Http\Controllers\Admin\BookingController::class, 'releaseVehicle']); // Confirm vehicle release
     Route::get('/bookings/for-release', [App\Http\Controllers\Admin\BookingController::class, 'forRelease']);
+    Route::get('/bookings/for-return', [App\Http\Controllers\Admin\BookingController::class, 'forReturn']);
+    Route::post('/bookings/{booking}/return', [App\Http\Controllers\Admin\BookingController::class, 'returnVehicle']);
+    Route::get('/bookings/completed', [App\Http\Controllers\Admin\BookingController::class, 'completed']); // Completed bookings history
 });

@@ -78,4 +78,16 @@ class BookingService
         
         return $rate * $days;
     }
+
+    /**
+     * Calculate late fee for a booking return
+     */
+    public function calculateLateFee($scheduledEnd, $actualReturn)
+    {
+        if ($actualReturn->greaterThan($scheduledEnd)) {
+            $hoursLate = $scheduledEnd->diffInHours($actualReturn);
+            return $hoursLate * 100; // ₱100/hour
+        }
+        return 0;
+    }
 }

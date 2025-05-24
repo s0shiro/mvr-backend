@@ -86,4 +86,9 @@ class Booking extends Model
     {
         return $this->hasOne(VehicleRelease::class);
     }
+    
+    public function vehicleReturn()
+    {
+        return $this->hasOne(VehicleReturn::class);
+    }
 }

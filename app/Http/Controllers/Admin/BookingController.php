@@ -15,6 +15,7 @@ class BookingController extends Controller
     public function index()
     {
         $bookings = Booking::with(['user', 'vehicle', 'payments', 'vehicleRelease'])
+            ->where('status', 'pending')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -28,6 +29,32 @@ class BookingController extends Controller
     {
         $bookings = Booking::with(['user', 'vehicle', 'payments', 'vehicleRelease'])
             ->where('status', 'for_release')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json(['bookings' => $bookings]);
+    }
+
+    /**
+     * List bookings ready for vehicle return (status = 'released')
+     */
+    public function forReturn()
+    {
+        $bookings = Booking::with(['user', 'vehicle', 'payments', 'vehicleRelease', 'vehicleReturn'])
+            ->where('status', 'released')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json(['bookings' => $bookings]);
+    }
+
+    /**
+     * List completed bookings (status = 'completed') for admin history
+     */
+    public function completed()
+    {
+        $bookings = Booking::with(['user', 'vehicle', 'payments', 'vehicleRelease', 'vehicleReturn'])
+            ->where('status', 'completed')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -104,5 +131,52 @@ class BookingController extends Controller
         $vehicle->save();
 
         return response()->json(['message' => 'Vehicle released', 'release' => $release]);
+    }
+
+    /**
+     * Process vehicle return, log details, update statuses, and calculate fees
+     */
+    public function returnVehicle(Request $request, Booking $booking)
+    {
+        $validated = $request->validate([
+            'returned_at' => 'nullable|date',
+            'odometer' => 'nullable|integer',
+            'fuel_level' => 'nullable|string',
+            'condition_notes' => 'nullable|string',
+            'images' => 'nullable|array',
+            'images.*' => 'nullable|string',
+            'late_fee' => 'nullable|numeric',
+            'damage_fee' => 'nullable|numeric',
+            'cleaning_fee' => 'nullable|numeric',
+        ]);
+
+        // Only allow return if booking is released and not already returned
+        if ($booking->status !== 'released' || $booking->vehicleReturn) {
+            return response()->json(['message' => 'Booking not eligible for return or already returned'], 422);
+        }
+
+        // Calculate late fee if not provided
+        $lateFee = $validated['late_fee'] ?? 0;
+        $scheduledEnd = $booking->end_date;
+        $actualReturn = isset($validated['returned_at']) ? now()->parse($validated['returned_at']) : now();
+        if ($actualReturn->greaterThan($scheduledEnd)) {
+            $hoursLate = $scheduledEnd->diffInHours($actualReturn);
+            $lateFee = $lateFee ?: ($hoursLate * 100); // ₱100/hour late fee
+        }
+
+        $return = $booking->vehicleReturn()->create(array_merge($validated, [
+            'vehicle_id' => $booking->vehicle_id,
+            'returned_at' => $validated['returned_at'] ?? now(),
+            'late_fee' => $lateFee,
+        ]));
+
+        // Update booking and vehicle status
+        $booking->status = 'completed';
+        $booking->save();
+        $vehicle = $booking->vehicle;
+        $vehicle->status = 'available'; // Always set to available after return
+        $vehicle->save();
+
+        return response()->json(['message' => 'Vehicle returned', 'return' => $return]);
     }
 }
