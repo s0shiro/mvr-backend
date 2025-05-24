@@ -13,10 +13,10 @@ return new class extends Migration {
             $table->foreignId('vehicle_id')->constrained()->onDelete('cascade');
             $table->dateTime('start_date');
             $table->dateTime('end_date');
-            $table->enum('status', ['pending', 'confirmed', 'for_release', 'cancelled', 'completed'])->default('pending');
+            $table->enum('status', ['pending', 'confirmed', 'for_release', 'released', 'cancelled', 'completed'])->default('pending');
             $table->decimal('total_price', 10, 2)->nullable();
             $table->text('notes')->nullable();
-            $table->boolean('driver_requested')->default(false);
+            $table->boolean('driver_requested')->default(false); 
             $table->enum('pickup_type', ['pickup', 'delivery'])->default('pickup');
             $table->string('delivery_location')->nullable();
             $table->text('delivery_details')->nullable()->comment('Barangay, landmark, and additional delivery instructions');

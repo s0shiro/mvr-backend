@@ -81,4 +81,9 @@ class Booking extends Model
     {
         return $this->latestRentalPayment();
     }
+
+    public function vehicleRelease()
+    {
+        return $this->hasOne(VehicleRelease::class);
+    }
 }
