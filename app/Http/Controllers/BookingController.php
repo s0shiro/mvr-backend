@@ -30,6 +30,9 @@ class BookingController extends Controller
             'pickup_type' => 'required|in:pickup,delivery',
             'delivery_location' => 'sometimes|required_if:pickup_type,delivery|string|in:' . implode(',', array_keys(Booking::DELIVERY_FEES)),
             'delivery_details' => 'sometimes|required_if:pickup_type,delivery|string|max:500',
+            'valid_ids' => 'required|array|size:2',
+            'valid_ids.id1' => 'required|string', // base64 string
+            'valid_ids.id2' => 'required|string', // base64 string
         ]);
         $userId = Auth::id();
         if (!$userId) {
@@ -44,7 +47,8 @@ class BookingController extends Controller
             $validated['driver_requested'] ?? false,
             $validated['pickup_type'] ?? 'pickup',
             $validated['delivery_location'] ?? null,
-            $validated['delivery_details'] ?? null
+            $validated['delivery_details'] ?? null,
+            $validated['valid_ids'] ?? null
         );
         if (!$booking) {
             return response()->json(['message' => 'Vehicle not available for selected dates'], 409);

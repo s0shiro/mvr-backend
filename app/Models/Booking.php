@@ -22,6 +22,7 @@ class Booking extends Model
         'delivery_location',
         'delivery_details',
         'delivery_fee',
+        'valid_ids', // JSON: {"id1": "base64string", "id2": "base64string"}
     ];
 
     const DELIVERY_FEES = [
@@ -90,5 +91,21 @@ class Booking extends Model
     public function vehicleReturn()
     {
         return $this->hasOne(VehicleReturn::class);
+    }
+
+    /**
+     * Get the valid IDs as an associative array.
+     */
+    public function getValidIdsAttribute($value)
+    {
+        return $value ? json_decode($value, true) : null;
+    }
+
+    /**
+     * Set the valid IDs as a JSON string.
+     */
+    public function setValidIdsAttribute($value)
+    {
+        $this->attributes['valid_ids'] = is_array($value) ? json_encode($value) : $value;
     }
 }

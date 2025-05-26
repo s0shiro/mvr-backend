@@ -15,7 +15,7 @@ class BookingController extends Controller
     public function index()
     {
         $bookings = Booking::with(['user', 'vehicle', 'payments', 'vehicleRelease'])
-            ->where('status', 'pending')
+            ->whereIn('status', ['pending', 'confirmed'])
             ->orderBy('created_at', 'desc')
             ->get();
 

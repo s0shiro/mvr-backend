@@ -33,7 +33,7 @@ class BookingService
     /**
      * Create a booking if available.
      */
-    public function createBooking($userId, $vehicleId, $startDate, $endDate, $notes = null, $driverRequested = false, $pickupType = 'pickup', $deliveryLocation = null, $deliveryDetails = null)
+    public function createBooking($userId, $vehicleId, $startDate, $endDate, $notes = null, $driverRequested = false, $pickupType = 'pickup', $deliveryLocation = null, $deliveryDetails = null, $validIds = null)
     {
         if ($this->isAvailable($vehicleId, $startDate, $endDate)) {
             return null; // Not available
@@ -61,6 +61,7 @@ class BookingService
             'delivery_location' => $deliveryLocation,
             'delivery_details' => $deliveryDetails,
             'delivery_fee' => $deliveryFee,
+            'valid_ids' => $validIds,
         ]);
     }
 

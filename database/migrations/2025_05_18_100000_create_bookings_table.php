@@ -21,6 +21,7 @@ return new class extends Migration {
             $table->string('delivery_location')->nullable();
             $table->text('delivery_details')->nullable()->comment('Barangay, landmark, and additional delivery instructions');
             $table->decimal('delivery_fee', 10, 2)->nullable();
+            $table->json('valid_ids')->nullable()->comment('Base64-encoded images of two valid IDs');
             $table->timestamps();
         });
     }
