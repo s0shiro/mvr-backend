@@ -63,6 +63,7 @@ class VehicleController extends Controller
             'capacity' => 'required|integer|min:1',
             'rental_rate' => 'required|numeric|min:0',
             'rental_rate_with_driver' => 'required|numeric|min:0',
+            'deposit' => 'required|numeric|min:0',
             'description' => 'nullable|string',
             'status' => 'required|string|in:available,maintenance,rented'
         ]);
@@ -116,6 +117,7 @@ class VehicleController extends Controller
             'capacity' => 'sometimes|integer|min:1',
             'rental_rate' => 'sometimes|numeric|min:0',
             'rental_rate_with_driver' => 'sometimes|numeric|min:0',
+            'deposit' => 'sometimes|numeric|min:0',
             'description' => 'nullable|string',
             'status' => 'sometimes|string|in:available,maintenance,rented'
         ]);

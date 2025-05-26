@@ -26,6 +26,7 @@ class Vehicle extends Model
         'capacity',
         'rental_rate',
         'rental_rate_with_driver',
+        'deposit',
         'description',
         'status',
     ];
@@ -39,6 +40,7 @@ class Vehicle extends Model
         'year' => 'integer',
         'capacity' => 'integer',
         'rental_rate' => 'decimal:2',
+        'deposit' => 'decimal:2',
     ];
 
     /**

@@ -22,6 +22,7 @@ return new class extends Migration
             $table->integer('capacity'); // number of passengers
             $table->decimal('rental_rate', 10, 2); // per day without driver
             $table->decimal('rental_rate_with_driver', 10, 2); // per day with driver
+            $table->decimal('deposit', 10, 2)->default(0); // deposit required for vehicle
             $table->text('description')->nullable();
             $table->string('status')->default('available'); // available, maintenance, rented
             $table->timestamps();

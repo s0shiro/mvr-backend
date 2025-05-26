@@ -68,7 +68,7 @@ class VehicleService
      */
     public function createVehicle(array $data): Vehicle
     {
-        return Vehicle::create($data);
+        return Vehicle::create($data); // 'deposit' is already handled by mass assignment
     }
 
     /**
@@ -76,7 +76,7 @@ class VehicleService
      */
     public function updateVehicle(Vehicle $vehicle, array $data): bool
     {
-        return $vehicle->update($data);
+        return $vehicle->update($data); // 'deposit' is already handled by mass assignment
     }
 
     /**
