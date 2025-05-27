@@ -93,6 +93,11 @@ class Booking extends Model
         return $this->hasOne(VehicleReturn::class);
     }
 
+    public function feedback()
+    {
+        return $this->hasMany(Feedback::class);
+    }
+
     /**
      * Get the valid IDs as an associative array.
      */

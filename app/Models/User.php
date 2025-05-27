@@ -9,6 +9,7 @@ use Illuminate\Notifications\Notifiable;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 use Spatie\Permission\Traits\HasRoles;
 use App\Models\Booking;
+use App\Models\Feedback;
 
 class User extends Authenticatable implements JWTSubject
 {
@@ -73,5 +74,10 @@ class User extends Authenticatable implements JWTSubject
     public function bookings()
     {
         return $this->hasMany(Booking::class);
+    }
+
+    public function feedback()
+    {
+        return $this->hasMany(Feedback::class);
     }
 }

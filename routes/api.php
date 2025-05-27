@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\FeedbackController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -51,6 +52,7 @@ Route::controller(BookingController::class)->middleware(['auth:api', 'role:admin
     Route::put('/bookings/{booking}', 'update'); // Modify booking (FR006)
     Route::post('/bookings/{booking}/cancel', 'cancel'); // Cancel booking (FR007)
     Route::get('/mybookings', 'myBookings'); // List bookings for the authenticated user
+    Route::get('/mybookings/completed', 'myCompletedBookings'); // List completed bookings for the authenticated user
 });
 
 // Payment routes
@@ -60,6 +62,17 @@ Route::controller(PaymentController::class)->middleware(['auth:api', 'role:admin
     Route::get('/bookings/{booking}/payment', 'show'); // View payment info
     Route::patch('/bookings/{booking}/payment/status', 'updateStatus'); // Admin updates payment status
 });
+
+// Feedback routes
+Route::controller(FeedbackController::class)
+    ->middleware(['auth:api', 'role:admin|customer|manager'])
+    ->group(function () {
+        Route::post('/feedback', 'store'); // Submit feedback
+        Route::get('/feedback', 'index'); // List all feedback (admin/manager)
+        Route::get('/feedback/booking/{bookingId}', 'byBooking'); // List feedback for a booking
+        Route::get('/feedback/user/{userId}', 'byUser'); // List feedback by user
+        Route::get('/feedback/vehicle/{vehicleId}', 'byVehicle'); // List feedback for a vehicle
+    });
 
 // Admin routes
 Route::middleware(['auth:api', 'role:admin'])->prefix('admin')->group(function () {

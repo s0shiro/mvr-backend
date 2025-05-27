@@ -203,4 +203,23 @@ class BookingController extends Controller
             ->get();
         return response()->json(['bookings' => $bookings]);
     }
+
+    /**
+     * List completed bookings for the authenticated user
+     */
+    public function myCompletedBookings(Request $request)
+    {
+        $userId = Auth::id();
+        $bookings = Booking::where('user_id', $userId)
+            ->where('status', 'completed')
+            ->with([
+                'vehicle',
+                'payments',
+                'latestDepositPayment',
+                'latestRentalPayment'
+            ])
+            ->orderByDesc('created_at')
+            ->get();
+        return response()->json(['completed_bookings' => $bookings]);
+    }
 }
