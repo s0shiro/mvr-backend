@@ -4,16 +4,21 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Services\BookingService;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Booking;
 
 class BookingController extends Controller
 {
     protected $bookingService;
+    protected $notificationService;
 
-    public function __construct(BookingService $bookingService)
-    {
+    public function __construct(
+        BookingService $bookingService,
+        NotificationService $notificationService
+    ) {
         $this->bookingService = $bookingService;
+        $this->notificationService = $notificationService;
     }
 
     /**
@@ -53,6 +58,17 @@ class BookingController extends Controller
         if (!$booking) {
             return response()->json(['message' => 'Vehicle not available for selected dates'], 409);
         }
+
+        // Send notification to admins
+        $this->notificationService->notifyAdmins('booking_created', $booking, [
+            'message' => 'New booking created',
+            'customer_name' => Auth::user()->name,
+            'vehicle_id' => $validated['vehicle_id'],
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+            'booking_id' => $booking->id
+        ]);
+
         return response()->json(['message' => 'Booking created', 'booking' => $booking], 201);
     }
 

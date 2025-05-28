@@ -83,6 +83,21 @@ class BookingController extends Controller
             $payment->booking->save();
         }
 
+        // Notify user about approval
+        app(\App\Services\NotificationService::class)->notifyUser(
+            $payment->booking->user_id,
+            'payment_status_updated',
+            $payment,
+            [
+                'message' => 'Your ' . $payment->type . ' payment has been approved',
+                'customer_name' => $payment->booking->user->name,
+                'payment_type' => $payment->type,
+                'payment_status' => 'approved',
+                'payment_method' => $payment->method,
+                'booking_id' => $payment->booking->id
+            ]
+        );
+
         return response()->json(['message' => 'Payment confirmed', 'payment' => $payment]);
     }
 
@@ -94,6 +109,21 @@ class BookingController extends Controller
         $payment = Payment::findOrFail($paymentId);
         $payment->status = 'rejected';
         $payment->save();
+
+        // Notify user about rejection
+        app(\App\Services\NotificationService::class)->notifyUser(
+            $payment->booking->user_id,
+            'payment_status_updated',
+            $payment,
+            [
+                'message' => 'Your ' . $payment->type . ' payment has been rejected. Please submit a new payment.',
+                'customer_name' => $payment->booking->user->name,
+                'payment_type' => $payment->type,
+                'payment_status' => 'rejected',
+                'payment_method' => $payment->method,
+                'booking_id' => $payment->booking->id
+            ]
+        );
 
         return response()->json(['message' => 'Payment rejected', 'payment' => $payment]);
     }
@@ -129,6 +159,21 @@ class BookingController extends Controller
         $vehicle = $booking->vehicle;
         $vehicle->status = 'in_use';
         $vehicle->save();
+
+        // Notify user about vehicle release
+        app(\App\Services\NotificationService::class)->notifyUser(
+            $booking->user_id,
+            'vehicle_released',
+            $booking,
+            [
+                'message' => 'Your vehicle for booking #' . $booking->id . ' has been released and is ready for use.',
+                'booking_id' => $booking->id,
+                'vehicle_id' => $booking->vehicle_id,
+                'start_date' => $booking->start_date,
+                'end_date' => $booking->end_date,
+                'vehicle' => $vehicle->name ?? ($vehicle->make ?? '') . ' ' . ($vehicle->model ?? '')
+            ]
+        );
 
         return response()->json(['message' => 'Vehicle released', 'release' => $release]);
     }

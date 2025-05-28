@@ -7,6 +7,7 @@ use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\FeedbackController;
+use App\Http\Controllers\NotificationController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -43,6 +44,13 @@ Route::controller(VehicleController::class)->group(function () {
         Route::put('/vehicles/{vehicle}/images/{imageId}/primary', 'setPrimaryImage');
         Route::put('/vehicles/{vehicle}/images/reorder', 'reorderImages');
     });
+});
+
+// Notification routes
+Route::controller(NotificationController::class)->middleware(['auth:api'])->group(function () {
+    Route::get('/notifications', 'index');
+    Route::post('/notifications/{id}/read', 'markAsRead');
+    Route::post('/notifications/mark-all-read', 'markAllAsRead');
 });
 
 // Booking routes
