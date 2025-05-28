@@ -48,9 +48,22 @@ class NotificationService
     public function notifyAdmins(string $type, Model $notifiable, array $data)
     {
         $admins = User::role('admin')->get();
-        
         foreach ($admins as $admin) {
             $this->create($type, $notifiable, $data, $admin);
+            // Send email notification if admin has email
+            if ($admin->email) {
+                $subject = $data['message'] ?? 'Notification';
+                $message = $data['message'] ?? '';
+                $details = $data;
+                try {
+                    \Mail::to($admin->email)->send(new \App\Mail\UserNotificationMail($subject, $message, $details));
+                } catch (\Exception $e) {
+                    \Log::error('Failed to send admin notification email: ' . $e->getMessage(), [
+                        'admin_id' => $admin->id,
+                        'email' => $admin->email,
+                    ]);
+                }
+            }
         }
     }
 
@@ -60,7 +73,24 @@ class NotificationService
     public function notifyUser(int $userId, string $type, Model $notifiable, array $data)
     {
         $user = User::findOrFail($userId);
-        return $this->create($type, $notifiable, $data, $user);
+        $notification = $this->create($type, $notifiable, $data, $user);
+
+        // Send email notification if user has email
+        if ($user->email) {
+            $subject = $data['message'] ?? 'Notification';
+            $message = $data['message'] ?? '';
+            $details = $data;
+            try {
+                \Mail::to($user->email)->send(new \App\Mail\UserNotificationMail($subject, $message, $details));
+            } catch (\Exception $e) {
+                \Log::error('Failed to send notification email: ' . $e->getMessage(), [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                ]);
+            }
+        }
+
+        return $notification;
     }
 
     /**
