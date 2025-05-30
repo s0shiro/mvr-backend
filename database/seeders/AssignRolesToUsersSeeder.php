@@ -17,6 +17,7 @@ class AssignRolesToUsersSeeder extends Seeder
             'username' => 'admin',
             'name' => 'Admin User',
             'password' => bcrypt('password'),
+            'email_verified_at' => now(),
         ]);
         $adminUser->assignRole('admin');
 
@@ -27,6 +28,7 @@ class AssignRolesToUsersSeeder extends Seeder
             'username' => 'manager',
             'name' => 'Manager User',
             'password' => bcrypt('password'),
+            'email_verified_at' => now(),
         ]);
         $managerUser->assignRole('manager');
 
@@ -37,6 +39,7 @@ class AssignRolesToUsersSeeder extends Seeder
             'username' => 'customer',
             'name' => 'Customer User',
             'password' => bcrypt('password'),
+            'email_verified_at' => now(),
         ]);
         $customerUser->assignRole('customer');
     }
