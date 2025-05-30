@@ -10,12 +10,23 @@ class AuthService
 {
     public function register(array $data)
     {
+        $verificationCode = random_int(100000, 999999); // 6-digit code
+        $expiresAt = now()->addMinutes(10);
         $user = User::create([
             'username' => $data['username'],
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
+            'verification_code' => $verificationCode,
+            'verification_code_expires_at' => $expiresAt,
         ]);
+        // Assign default role
+        $user->assignRole('customer');
+        // Send code via email
+        \Mail::to($user->email)->send(new \App\Mail\UserNotificationMail(
+            'Your Verification Code',
+            "Your verification code is: $verificationCode"
+        ));
         return $user;
     }
 

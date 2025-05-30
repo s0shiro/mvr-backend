@@ -20,6 +20,8 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('/logout', 'logout')->middleware('auth:api');
     Route::post('/refresh', 'refresh');
     Route::post('/change-password', 'changePassword')->middleware('auth:api');
+    Route::post('/verify-code', 'verifyCode'); // <-- Add this line
+    Route::post('/resend-verification-code', 'resendVerificationCode'); // Resend verification code
 });
 
 // Vehicle routes

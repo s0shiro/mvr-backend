@@ -244,4 +244,54 @@ class AuthController extends Controller
             'message' => 'Password changed successfully',
         ]);
     }
+
+    public function verifyCode(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'code' => 'required|string',
+        ]);
+        $user = User::where('email', $request->email)->first();
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'User not found'], 404);
+        }
+        if ($user->email_verified_at) {
+            return response()->json(['status' => 'error', 'message' => 'Email already verified'], 400);
+        }
+        if ($user->verification_code !== $request->code) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid verification code'], 400);
+        }
+        if (now()->greaterThan($user->verification_code_expires_at)) {
+            return response()->json(['status' => 'error', 'message' => 'Verification code expired'], 400);
+        }
+        $user->email_verified_at = now();
+        $user->verification_code = null;
+        $user->verification_code_expires_at = null;
+        $user->save();
+        return response()->json(['status' => 'success', 'message' => 'Email verified successfully']);
+    }
+
+    public function resendVerificationCode(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+        $user = User::where('email', $request->email)->first();
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'User not found'], 404);
+        }
+        if ($user->email_verified_at) {
+            return response()->json(['status' => 'error', 'message' => 'Email already verified'], 400);
+        }
+        $verificationCode = random_int(100000, 999999);
+        $expiresAt = now()->addMinutes(10);
+        $user->verification_code = $verificationCode;
+        $user->verification_code_expires_at = $expiresAt;
+        $user->save();
+        \Mail::to($user->email)->send(new \App\Mail\UserNotificationMail(
+            'Your Verification Code',
+            "Your verification code is: $verificationCode"
+        ));
+        return response()->json(['status' => 'success', 'message' => 'Verification code resent']);
+    }
 }
