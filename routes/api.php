@@ -102,3 +102,19 @@ Route::middleware(['auth:api', 'role:admin'])->prefix('admin')->group(function (
     Route::put('/users/{user}', [App\Http\Controllers\Admin\UserController::class, 'update']);
     Route::delete('/users/{user}', [App\Http\Controllers\Admin\UserController::class, 'destroy']);
 });
+
+// Business routes (admin only)
+Route::middleware(['auth:api', 'role:admin'])->group(function () {
+    Route::get('/businesses', [App\Http\Controllers\BusinessController::class, 'index']);
+    Route::post('/businesses', [App\Http\Controllers\BusinessController::class, 'store']);
+    Route::get('/businesses/{id}', [App\Http\Controllers\BusinessController::class, 'show']);
+    Route::put('/businesses/{id}', [App\Http\Controllers\BusinessController::class, 'update']);
+    Route::delete('/businesses/{id}', [App\Http\Controllers\BusinessController::class, 'destroy']);
+
+    // Business sales/notes routes (admin only)
+    Route::get('/businesses/{business}/sales', [App\Http\Controllers\BusinessSaleController::class, 'index']);
+    Route::post('/businesses/{business}/sales', [App\Http\Controllers\BusinessSaleController::class, 'store']);
+    Route::get('/businesses/{business}/sales/{id}', [App\Http\Controllers\BusinessSaleController::class, 'show']);
+    Route::put('/businesses/{business}/sales/{id}', [App\Http\Controllers\BusinessSaleController::class, 'update']);
+    Route::delete('/businesses/{business}/sales/{id}', [App\Http\Controllers\BusinessSaleController::class, 'destroy']);
+});
