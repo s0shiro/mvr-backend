@@ -101,6 +101,12 @@ Route::middleware(['auth:api', 'role:admin'])->prefix('admin')->group(function (
     Route::post('/users', [App\Http\Controllers\Admin\UserController::class, 'store']);
     Route::put('/users/{user}', [App\Http\Controllers\Admin\UserController::class, 'update']);
     Route::delete('/users/{user}', [App\Http\Controllers\Admin\UserController::class, 'destroy']);
+
+    // Payment method management
+    Route::get('/payment-methods', [\App\Http\Controllers\PaymentMethodController::class, 'index']);
+    Route::post('/payment-methods', [\App\Http\Controllers\PaymentMethodController::class, 'store']);
+    Route::put('/payment-methods/{id}', [\App\Http\Controllers\PaymentMethodController::class, 'update']);
+    Route::delete('/payment-methods/{id}', [\App\Http\Controllers\PaymentMethodController::class, 'destroy']);
 });
 
 // Business routes (admin only)

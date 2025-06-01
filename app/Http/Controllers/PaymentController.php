@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Booking;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\Auth;
 
@@ -17,31 +18,26 @@ class PaymentController extends Controller
         $this->notificationService = $notificationService;
     }
 
-    // Static payment info for demo
-    private $paymentMethods = [
-        'gcash' => [
-            'label' => 'GCash',
-            'account_name' => 'MVR Rentals',
-            'account_number' => '09171234567',
-        ],
-        'bank_transfer' => [
-            'label' => 'Bank Transfer',
-            'bank_name' => 'BDO',
-            'account_name' => 'MVR Rentals',
-            'account_number' => '1234567890',
-        ],
-    ];
-
     public function methods()
     {
-        return response()->json($this->paymentMethods);
+        $methods = PaymentMethod::all();
+        return response()->json($methods);
     }
 
     // Customer submits payment info
     public function store(Request $request, $bookingId)
     {
         $validated = $request->validate([
-            'method' => 'required|in:gcash,bank_transfer',
+            'method' => [
+                'required',
+                'string',
+                // Ensure the method exists in the payment_methods table
+                function ($attribute, $value, $fail) {
+                    if (!\App\Models\PaymentMethod::where('key', $value)->exists()) {
+                        $fail('Selected payment method is invalid.');
+                    }
+                },
+            ],
             'reference_number' => 'required|string',
             'proof_image' => 'required|string', // base64
             'type' => 'in:deposit,rental', // optional, default to deposit
