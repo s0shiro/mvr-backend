@@ -124,3 +124,6 @@ Route::middleware(['auth:api', 'role:admin'])->group(function () {
     Route::put('/businesses/{business}/sales/{id}', [App\Http\Controllers\BusinessSaleController::class, 'update']);
     Route::delete('/businesses/{business}/sales/{id}', [App\Http\Controllers\BusinessSaleController::class, 'destroy']);
 });
+
+// Admin dashboard overview
+Route::middleware(['auth:api', 'role:admin'])->get('/admin/overview', [\App\Http\Controllers\DashboardController::class, 'adminOverview']);
