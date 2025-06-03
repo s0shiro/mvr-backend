@@ -64,6 +64,7 @@ Route::controller(BookingController::class)->middleware(['auth:api', 'role:admin
     Route::get('/mybookings', 'myBookings'); // List bookings for the authenticated user
     Route::get('/mybookings/completed', 'myCompletedBookings'); // List completed bookings for the authenticated user
     Route::get('/bookings/{booking}/summary-details', 'summaryDetails'); // Get detailed booking summary
+    Route::get('/bookings/{booking}/completed-details', 'completedBookingDetails'); // Get comprehensive completed booking summary
 });
 
 // Payment routes

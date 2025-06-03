@@ -199,12 +199,18 @@ class BookingController extends Controller
         } elseif ($hours >= 24) {
             $refund = 0.5;
         }
+        // Refund is based on the vehicle's deposit, not total_price
+        $vehicle = $booking->vehicle;
+        $deposit = $vehicle ? $vehicle->deposit : 0;
+        $refundAmount = $deposit * $refund;
         $booking->status = 'cancelled';
+        $booking->refund_rate = $refund;
+        $booking->refund_amount = $refundAmount;
         $booking->save();
         return response()->json([
             'message' => 'Booking cancelled',
             'refund_rate' => $refund,
-            'refund_amount' => $booking->total_price * $refund,
+            'refund_amount' => $refundAmount,
         ]);
     }
 
@@ -287,5 +293,85 @@ class BookingController extends Controller
             'daily_rate_words' => $vehicle?->rental_rate ? strtoupper($numberTransformer->toWords((int) $vehicle->rental_rate)) . ' PESOS' : null,
         ];
         return response()->json(['booking_summary' => $response]);
+    }
+
+    /**
+     * Get a comprehensive summary of a completed booking, including all related details
+     *
+     * @param int $bookingId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function completedBookingDetails($bookingId)
+    {
+        $booking = Booking::with([
+            'user',
+            'vehicle',
+            'vehicleRelease',
+            'vehicleReturn',
+            'payments',
+            'latestDepositPayment',
+            'latestRentalPayment',
+        ])->findOrFail($bookingId);
+        if ($booking->status !== 'completed') {
+            return response()->json(['message' => 'Booking is not completed.'], 422);
+        }
+        $user = $booking->user;
+        $vehicle = $booking->vehicle;
+        $release = $booking->vehicleRelease;
+        $return = $booking->vehicleReturn;
+        $payments = $booking->payments;
+        $depositPayment = $booking->latestDepositPayment;
+        $rentalPayment = $booking->latestRentalPayment;
+        $releaseDate = $booking->vehilceRelease?->released_at ?? $booking->start_date;
+        $executedAt = $booking->updated_at ?? $booking->created_at;
+        $periodDays = $booking->days ?? (\Carbon\Carbon::parse($booking->start_date)->diffInDays(\Carbon\Carbon::parse($booking->end_date)) + 1);
+
+        // Convert numbers to words
+        $numberToWords = new \NumberToWords\NumberToWords();
+        $numberTransformer = $numberToWords->getNumberTransformer('en');
+        $rentalAmountWords = $booking->total_price !== null ? strtoupper($numberTransformer->toWords((int) $booking->total_price)) . ' PESOS' : null;
+        $securityDepositWords = $vehicle?->deposit !== null ? strtoupper($numberTransformer->toWords((int) $vehicle->deposit)) . ' PESOS' : null;
+
+        $response = [
+            'executed_at' => $executedAt ? \Carbon\Carbon::parse($executedAt)->format('d/m/Y') : null,
+            'customer_name' => $user?->name,
+            'customer_address' => $user?->address,
+            'vehicle' => [
+                'name' => $vehicle?->name,
+                'brand' => $vehicle?->brand,
+                'year' => $vehicle?->year,
+                'model' => $vehicle?->model,
+            ],
+            'period' => $periodDays . ' day' . ($periodDays > 1 ? 's' : ''),
+            'release_date' => $releaseDate ? \Carbon\Carbon::parse($releaseDate)->format('d/m/Y') : null,
+            'rental_amount' => $booking->total_price,
+            'rental_amount_words' => $rentalAmountWords,
+            'security_deposit' => $vehicle?->deposit,
+            'security_deposit_words' => $securityDepositWords,
+            'hourly_rate' => $vehicle?->rental_rate ? round($vehicle->rental_rate / 24, 2) : null,
+            'daily_rate' => $vehicle?->rental_rate,
+            'daily_rate_words' => $vehicle?->rental_rate ? strtoupper($numberTransformer->toWords((int) $vehicle->rental_rate)) . ' PESOS' : null,
+            'payments' => $payments,
+            'deposit_payment' => $depositPayment,
+            'rental_payment' => $rentalPayment,
+            'vehicle_release' => $release ? [
+                'released_at' => $release->released_at ? $release->released_at->format('d/m/Y H:i') : null,
+                'odometer' => $release->odometer,
+                'fuel_level' => $release->fuel_level,
+                'condition_notes' => $release->condition_notes,
+                'images' => $release->images,
+            ] : null,
+            'vehicle_return' => $return ? [
+                'returned_at' => $return->returned_at ? $return->returned_at->format('d/m/Y H:i') : null,
+                'odometer' => $return->odometer,
+                'fuel_level' => $return->fuel_level,
+                'condition_notes' => $return->condition_notes,
+                'images' => $return->images,
+                'late_fee' => $return->late_fee,
+                'damage_fee' => $return->damage_fee,
+                'cleaning_fee' => $return->cleaning_fee,
+            ] : null,
+        ];
+        return response()->json(['completed_booking_summary' => $response]);
     }
 }

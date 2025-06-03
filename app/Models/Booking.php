@@ -24,6 +24,8 @@ class Booking extends Model
         'delivery_fee',
         'valid_ids', // JSON: {"id1": "base64string", "id2": "base64string"}
         'days', // Number of days for the booking
+        'refund_rate', // Refund rate applied on cancellation
+        'refund_amount', // Refund amount applied on cancellation
     ];
 
     const DELIVERY_FEES = [

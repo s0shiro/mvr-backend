@@ -23,6 +23,8 @@ return new class extends Migration {
             $table->decimal('delivery_fee', 10, 2)->nullable();
             $table->json('valid_ids')->nullable()->comment('Base64-encoded images of two valid IDs');
             $table->unsignedInteger('days')->nullable()->comment('Number of days for the booking');
+            $table->decimal('refund_rate', 4, 2)->nullable()->comment('Refund rate applied on cancellation');
+            $table->decimal('refund_amount', 10, 2)->nullable()->comment('Refund amount applied on cancellation');
             $table->timestamps();
         });
     }
