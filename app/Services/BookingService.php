@@ -45,9 +45,12 @@ class BookingService
         if ($pickupType === 'delivery' && $deliveryLocation) {
             $deliveryFee = Booking::DELIVERY_FEES[$deliveryLocation] ?? 0;
         }
-
         $totalPrice = $this->calculatePrice($vehicle, $startDate, $endDate, $driverRequested);
-        
+        // Calculate days as integer (ceil for partial days, always at least 1)
+        $start = Carbon::parse($startDate);
+        $end = Carbon::parse($endDate);
+        $hours = $start->floatDiffInHours($end);
+        $days = max(1, (int) ceil($hours / 24));
         return Booking::create([
             'user_id' => $userId,
             'vehicle_id' => $vehicleId,
@@ -62,6 +65,7 @@ class BookingService
             'delivery_details' => $deliveryDetails,
             'delivery_fee' => $deliveryFee,
             'valid_ids' => $validIds,
+            'days' => $days,
         ]);
     }
 

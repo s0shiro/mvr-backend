@@ -7,6 +7,7 @@ use App\Services\BookingService;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Booking;
+use NumberToWords\NumberToWords;
 
 class BookingController extends Controller
 {
@@ -157,7 +158,11 @@ class BookingController extends Controller
         }
         // Calculate delivery fee
         $deliveryFee = $pickupType === 'delivery' ? (Booking::DELIVERY_FEES[$deliveryLocation] ?? 0) : 0;
-        
+        // Calculate days as integer (ceil for partial days, always at least 1)
+        $start = \Carbon\Carbon::parse($startDate);
+        $end = \Carbon\Carbon::parse($endDate);
+        $hours = $start->floatDiffInHours($end);
+        $days = max(1, (int) ceil($hours / 24));
         $booking->update(array_merge($validated, [
             'vehicle_id' => $vehicleId,
             'start_date' => $startDate,
@@ -167,6 +172,7 @@ class BookingController extends Controller
             'delivery_details' => $deliveryDetails,
             'delivery_fee' => $deliveryFee,
             'total_price' => $service->calculatePrice($booking->vehicle, $startDate, $endDate) + $deliveryFee,
+            'days' => $days,
         ]));
         return response()->json(['message' => 'Booking updated', 'booking' => $booking]);
     }
@@ -237,5 +243,49 @@ class BookingController extends Controller
             ->orderByDesc('created_at')
             ->get();
         return response()->json(['completed_bookings' => $bookings]);
+    }
+
+    /**
+     * Get a detailed summary of a booking
+     *
+     * @param int $bookingId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function summaryDetails($bookingId)
+    {
+        $booking = Booking::with(['user', 'vehicle', 'vehicleRelease'])->findOrFail($bookingId);
+        $user = $booking->user;
+        $vehicle = $booking->vehicle;
+        $releaseDate = $booking->start_date;
+        $executedAt = $booking->updated_at ?? $booking->created_at;
+        $periodDays = $booking->days ?? (\Carbon\Carbon::parse($booking->start_date)->diffInDays(\Carbon\Carbon::parse($booking->end_date)) + 1);
+
+        // Convert numbers to words
+        $numberToWords = new NumberToWords();
+        $numberTransformer = $numberToWords->getNumberTransformer('en');
+        $rentalAmountWords = $booking->total_price !== null ? strtoupper($numberTransformer->toWords((int) $booking->total_price)) . ' PESOS' : null;
+        $securityDepositWords = $vehicle?->deposit !== null ? strtoupper($numberTransformer->toWords((int) $vehicle->deposit)) . ' PESOS' : null;
+
+        $response = [
+            'executed_at' => $executedAt ? \Carbon\Carbon::parse($executedAt)->format('d/m/Y') : null,
+            'customer_name' => $user?->name,
+            'customer_address' => $user?->address,
+            'vehicle' => [
+                'name' => $vehicle?->name,
+                'brand' => $vehicle?->brand,
+                'year' => $vehicle?->year,
+                'model' => $vehicle?->model,
+            ],
+            'period' => $periodDays . ' day' . ($periodDays > 1 ? 's' : ''),
+            'release_date' => $releaseDate ? \Carbon\Carbon::parse($releaseDate)->format('d/m/Y') : null,
+            'rental_amount' => $booking->total_price,
+            'rental_amount_words' => $rentalAmountWords,
+            'security_deposit' => $vehicle?->deposit,
+            'security_deposit_words' => $securityDepositWords,
+            'hourly_rate' => $vehicle?->rental_rate ? round($vehicle->rental_rate / 24, 2) : null,
+            'daily_rate' => $vehicle?->rental_rate,
+            'daily_rate_words' => $vehicle?->rental_rate ? strtoupper($numberTransformer->toWords((int) $vehicle->rental_rate)) . ' PESOS' : null,
+        ];
+        return response()->json(['booking_summary' => $response]);
     }
 }

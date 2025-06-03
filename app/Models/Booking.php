@@ -23,6 +23,7 @@ class Booking extends Model
         'delivery_details',
         'delivery_fee',
         'valid_ids', // JSON: {"id1": "base64string", "id2": "base64string"}
+        'days', // Number of days for the booking
     ];
 
     const DELIVERY_FEES = [

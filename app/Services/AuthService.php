@@ -15,6 +15,7 @@ class AuthService
         $user = User::create([
             'username' => $data['username'],
             'name' => $data['name'],
+            'address' => $data['address'] ?? null,
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'verification_code' => $verificationCode,

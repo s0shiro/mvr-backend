@@ -16,6 +16,7 @@ class AssignRolesToUsersSeeder extends Seeder
         ], [
             'username' => 'admin',
             'name' => 'Admin User',
+            'address' => '123 Admin St, City',
             'password' => bcrypt('password'),
             'email_verified_at' => now(),
         ]);
@@ -27,6 +28,7 @@ class AssignRolesToUsersSeeder extends Seeder
         ], [
             'username' => 'manager',
             'name' => 'Manager User',
+            'address' => '456 Manager Ave, City',
             'password' => bcrypt('password'),
             'email_verified_at' => now(),
         ]);
@@ -38,6 +40,7 @@ class AssignRolesToUsersSeeder extends Seeder
         ], [
             'username' => 'customer',
             'name' => 'Customer User',
+            'address' => '789 Customer Rd, City',
             'password' => bcrypt('password'),
             'email_verified_at' => now(),
         ]);

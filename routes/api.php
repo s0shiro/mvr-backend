@@ -63,6 +63,7 @@ Route::controller(BookingController::class)->middleware(['auth:api', 'role:admin
     Route::post('/bookings/{booking}/cancel', 'cancel'); // Cancel booking (FR007)
     Route::get('/mybookings', 'myBookings'); // List bookings for the authenticated user
     Route::get('/mybookings/completed', 'myCompletedBookings'); // List completed bookings for the authenticated user
+    Route::get('/bookings/{booking}/summary-details', 'summaryDetails'); // Get detailed booking summary
 });
 
 // Payment routes

@@ -59,11 +59,12 @@ class AuthController extends Controller
         $request->validate([
             'username' => 'required|string|max:255|unique:users',
             'name' => 'required|string|max:255',
+            'address' => 'string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        $user = $this->authService->register($request->only(['username', 'name', 'email', 'password']));
+        $user = $this->authService->register($request->only(['username', 'name', 'address', 'email', 'password']));
         $tokens = $this->authService->generateTokens($user);
         $cookieSettings = $this->getCookieSettings();
 
