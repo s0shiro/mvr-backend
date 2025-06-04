@@ -8,11 +8,33 @@ use Illuminate\Support\Facades\Auth;
 
 class BusinessSaleController extends Controller
 {
-    // List all sales/notes for a business
-    public function index($businessId)
+    // List all sales/notes for a business with cursor-based pagination
+    public function index(Request $request, $businessId)
     {
-        $sales = BusinessSale::where('business_id', $businessId)->orderBy('date', 'desc')->get();
-        return response()->json($sales);
+        $limit = 10;
+        $cursor = $request->input('cursor');
+        $query = BusinessSale::where('business_id', $businessId)->orderBy('date', 'desc')->orderBy('id', 'desc');
+        if ($cursor) {
+            // Assuming cursor is a composite of date|id for uniqueness
+            [$date, $id] = explode('|', $cursor);
+            $query->where(function($q) use ($date, $id) {
+                $q->where('date', '<', $date)
+                  ->orWhere(function($q2) use ($date, $id) {
+                      $q2->where('date', $date)->where('id', '<', $id);
+                  });
+            });
+        }
+        $sales = $query->limit($limit + 1)->get();
+        $nextCursor = null;
+        if ($sales->count() > $limit) {
+            $last = $sales->slice($limit, 1)->first();
+            $nextCursor = $last->date . '|' . $last->id;
+            $sales = $sales->slice(0, $limit);
+        }
+        return response()->json([
+            'data' => $sales->values(),
+            'next_cursor' => $nextCursor,
+        ]);
     }
 
     // Store a new sale/note
@@ -83,24 +105,61 @@ class BusinessSaleController extends Controller
             $query->where('date', '<=', $request->input('to'));
         }
 
+        // Format average, min, max to 2 decimal places in SQL
         if ($group === 'month') {
-            $summary = $query->selectRaw("to_char(date, 'YYYY-MM') as date, MIN(date) as period_start, MAX(date) as period_end, SUM(amount)::float as total_sales, COUNT(*) as sales_count, AVG(amount)::float as avg_sale, MIN(amount)::float as min_sale, MAX(amount)::float as max_sale")
+            $summary = $query->selectRaw("
+                to_char(date, 'YYYY-MM') as date,
+                MIN(date) as period_start,
+                MAX(date) as period_end,
+                SUM(amount)::float as total_sales,
+                COUNT(*) as sales_count,
+                ROUND(AVG(amount)::numeric, 2)::float as avg_sale,
+                ROUND(MIN(amount)::numeric, 2)::float as min_sale,
+                ROUND(MAX(amount)::numeric, 2)::float as max_sale
+            ")
                 ->groupByRaw("to_char(date, 'YYYY-MM')")
                 ->orderBy('date')
                 ->get();
         } elseif ($group === 'week') {
-            $summary = $query->selectRaw("to_char(date, 'IYYY-IW') as date, MIN(date) as period_start, MAX(date) as period_end, SUM(amount)::float as total_sales, COUNT(*) as sales_count, AVG(amount)::float as avg_sale, MIN(amount)::float as min_sale, MAX(amount)::float as max_sale")
+            $summary = $query->selectRaw("
+                to_char(date, 'IYYY-IW') as date,
+                MIN(date) as period_start,
+                MAX(date) as period_end,
+                SUM(amount)::float as total_sales,
+                COUNT(*) as sales_count,
+                ROUND(AVG(amount)::numeric, 2)::float as avg_sale,
+                ROUND(MIN(amount)::numeric, 2)::float as min_sale,
+                ROUND(MAX(amount)::numeric, 2)::float as max_sale
+            ")
                 ->groupByRaw("to_char(date, 'IYYY-IW')")
                 ->orderBy('date')
                 ->get();
         } elseif ($group === 'day') {
-            $summary = $query->selectRaw("date as date, date as period_start, date as period_end, SUM(amount)::float as total_sales, COUNT(*) as sales_count, AVG(amount)::float as avg_sale, MIN(amount)::float as min_sale, MAX(amount)::float as max_sale")
+            $summary = $query->selectRaw("
+                date as date,
+                date as period_start,
+                date as period_end,
+                SUM(amount)::float as total_sales,
+                COUNT(*) as sales_count,
+                ROUND(AVG(amount)::numeric, 2)::float as avg_sale,
+                ROUND(MIN(amount)::numeric, 2)::float as min_sale,
+                ROUND(MAX(amount)::numeric, 2)::float as max_sale
+            ")
                 ->groupBy('date')
                 ->orderBy('date')
                 ->get();
         } else {
             // fallback: group by day
-            $summary = $query->selectRaw("date as date, date as period_start, date as period_end, SUM(amount)::float as total_sales, COUNT(*) as sales_count, AVG(amount)::float as avg_sale, MIN(amount)::float as min_sale, MAX(amount)::float as max_sale")
+            $summary = $query->selectRaw("
+                date as date,
+                date as period_start,
+                date as period_end,
+                SUM(amount)::float as total_sales,
+                COUNT(*) as sales_count,
+                ROUND(AVG(amount)::numeric, 2)::float as avg_sale,
+                ROUND(MIN(amount)::numeric, 2)::float as min_sale,
+                ROUND(MAX(amount)::numeric, 2)::float as max_sale
+            ")
                 ->groupBy('date')
                 ->orderBy('date')
                 ->get();
