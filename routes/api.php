@@ -120,6 +120,7 @@ Route::middleware(['auth:api', 'role:admin'])->group(function () {
     Route::delete('/businesses/{id}', [App\Http\Controllers\BusinessController::class, 'destroy']);
 
     // Business sales/notes routes (admin only)
+    Route::get('/businesses/{business}/sales/summary', [App\Http\Controllers\BusinessSaleController::class, 'summary']);
     Route::get('/businesses/{business}/sales', [App\Http\Controllers\BusinessSaleController::class, 'index']);
     Route::post('/businesses/{business}/sales', [App\Http\Controllers\BusinessSaleController::class, 'store']);
     Route::get('/businesses/{business}/sales/{id}', [App\Http\Controllers\BusinessSaleController::class, 'show']);

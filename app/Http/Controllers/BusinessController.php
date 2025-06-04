@@ -20,11 +20,13 @@ class BusinessController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'type' => 'required|string|in:resort,photography',
             'description' => 'nullable|string',
         ]);
 
         $business = Business::create([
             'name' => $request->name,
+            'type' => $request->type,
             'description' => $request->description,
             'created_by' => Auth::id(),
         ]);
@@ -45,9 +47,10 @@ class BusinessController extends Controller
         $business = Business::findOrFail($id);
         $request->validate([
             'name' => 'required|string|max:255',
+            'type' => 'required|string|in:resort,photography',
             'description' => 'nullable|string',
         ]);
-        $business->update($request->only(['name', 'description']));
+        $business->update($request->only(['name', 'type', 'description']));
         return response()->json($business);
     }
 

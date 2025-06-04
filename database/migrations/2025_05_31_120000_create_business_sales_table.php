@@ -15,6 +15,7 @@ return new class extends Migration
             $table->decimal('amount', 12, 2)->nullable();
             $table->string('type')->default('sale'); // sale, note, refund, etc.
             $table->text('note')->nullable();
+            $table->json('details')->nullable();
             $table->unsignedBigInteger('created_by');
             $table->timestamps();
 

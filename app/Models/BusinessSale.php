@@ -15,7 +15,12 @@ class BusinessSale extends Model
         'amount',
         'type',
         'note',
+        'details',
         'created_by',
+    ];
+
+    protected $casts = [
+        'details' => 'array',
     ];
 
     public function business()
