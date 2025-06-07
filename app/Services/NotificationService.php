@@ -126,4 +126,14 @@ class NotificationService
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
     }
+
+    /**
+     * Get count of unread notifications for a user
+     */
+    public function getUnreadCount(User $user)
+    {
+        return Notification::where('user_id', $user->id)
+            ->whereNull('read_at')
+            ->count();
+    }
 }

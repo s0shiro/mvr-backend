@@ -8,6 +8,7 @@ use App\Http\Controllers\BookingController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\CustomerDashboardController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -130,3 +131,6 @@ Route::middleware(['auth:api', 'role:admin'])->group(function () {
 
 // Admin dashboard overview
 Route::middleware(['auth:api', 'role:admin'])->get('/admin/overview', [\App\Http\Controllers\DashboardController::class, 'adminOverview']);
+
+// Customer dashboard overview
+Route::middleware(['auth:api', 'role:customer'])->get('/customer/overview', [CustomerDashboardController::class, 'overview']);

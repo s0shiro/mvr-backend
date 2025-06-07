@@ -95,4 +95,27 @@ class BookingService
         }
         return 0;
     }
+
+    /**
+     * Get booking summary for a user (for dashboard)
+     */
+    public function getUserBookingSummary($userId)
+    {
+        // Get all bookings for the user, with vehicle info, ordered by start date desc
+        return \App\Models\Booking::with('vehicle')
+            ->where('user_id', $userId)
+            ->orderByDesc('start_date')
+            ->get();
+    }
+
+    /**
+     * Get all bookings for a user
+     */
+    public function getUserBookings($userId)
+    {
+        return Booking::where('user_id', $userId)
+            ->with('vehicle')
+            ->latest()
+            ->get();
+    }
 }
