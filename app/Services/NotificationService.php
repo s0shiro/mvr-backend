@@ -43,24 +43,24 @@ class NotificationService
     }
 
     /**
-     * Create notifications for all admins
+     * Create notifications for all admins and managers
      */
     public function notifyAdmins(string $type, Model $notifiable, array $data)
     {
-        $admins = User::role('admin')->get();
-        foreach ($admins as $admin) {
-            $this->create($type, $notifiable, $data, $admin);
-            // Send email notification if admin has email
-            if ($admin->email) {
+        $users = User::role(['admin', 'manager'])->get();
+        foreach ($users as $user) {
+            $this->create($type, $notifiable, $data, $user);
+            // Send email notification if user has email
+            if ($user->email) {
                 $subject = $data['message'] ?? 'Notification';
                 $message = $data['message'] ?? '';
                 $details = $data;
                 try {
-                    \Mail::to($admin->email)->send(new \App\Mail\UserNotificationMail($subject, $message, $details));
+                    \Mail::to($user->email)->send(new \App\Mail\UserNotificationMail($subject, $message, $details));
                 } catch (\Exception $e) {
-                    \Log::error('Failed to send admin notification email: ' . $e->getMessage(), [
-                        'admin_id' => $admin->id,
-                        'email' => $admin->email,
+                    \Log::error('Failed to send admin/manager notification email: ' . $e->getMessage(), [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
                     ]);
                 }
             }

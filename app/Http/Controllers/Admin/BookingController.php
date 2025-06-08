@@ -139,12 +139,18 @@ class BookingController extends Controller
             'odometer' => 'nullable|integer',
             'released_at' => 'nullable|date',
             'images' => 'nullable|array',
-            'images.*' => 'nullable|string', // base64 or url
+            'images.*' => 'nullable|string', 
         ]);
 
         // Only allow release if booking is for_release and not already released
         if ($booking->status !== 'for_release' || $booking->vehicleRelease) {
             return response()->json(['message' => 'Booking not eligible for release or already released'], 422);
+        }
+
+        // Prevent release if vehicle is already in use
+        $vehicle = $booking->vehicle;
+        if ($vehicle->status === 'in_use') {
+            return response()->json(['message' => 'Vehicle is already in use and cannot be released for this booking'], 422);
         }
 
         $release = $booking->vehicleRelease()->create(array_merge($validated, [
@@ -156,7 +162,6 @@ class BookingController extends Controller
         $booking->save();
 
         // Update vehicle status to in_use
-        $vehicle = $booking->vehicle;
         $vehicle->status = 'in_use';
         $vehicle->save();
 

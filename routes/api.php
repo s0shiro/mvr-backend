@@ -12,7 +12,7 @@ use App\Http\Controllers\CustomerDashboardController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
-})->middleware(['auth:api','role:admin|customer']);
+})->middleware(['auth:api','role:admin|customer|manager']);
 
 // Auth routes
 Route::controller(AuthController::class)->group(function () {
@@ -88,7 +88,7 @@ Route::controller(FeedbackController::class)
     });
 
 // Admin routes
-Route::middleware(['auth:api', 'role:admin'])->prefix('admin')->group(function () {
+Route::middleware(['auth:api', 'role:admin|manager'])->prefix('admin')->group(function () {
     Route::get('/bookings', [App\Http\Controllers\Admin\BookingController::class, 'index']);
     Route::post('/bookings/payments/{paymentId}/confirm', [App\Http\Controllers\Admin\BookingController::class, 'confirmPayment']);
     Route::post('/bookings/payments/{paymentId}/reject', [App\Http\Controllers\Admin\BookingController::class, 'rejectPayment']);
@@ -130,7 +130,7 @@ Route::middleware(['auth:api', 'role:admin'])->group(function () {
 });
 
 // Admin dashboard overview
-Route::middleware(['auth:api', 'role:admin'])->get('/admin/overview', [\App\Http\Controllers\DashboardController::class, 'adminOverview']);
+Route::middleware(['auth:api', 'role:admin|manager'])->get('/admin/overview', [\App\Http\Controllers\DashboardController::class, 'adminOverview']);
 
 // Customer dashboard overview
 Route::middleware(['auth:api', 'role:customer'])->get('/customer/overview', [CustomerDashboardController::class, 'overview']);

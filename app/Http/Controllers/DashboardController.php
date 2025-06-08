@@ -12,17 +12,20 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    // Admin overview endpoint
+    // Dashboard overview endpoint for both admin and manager
     public function adminOverview(Request $request)
     {
+        $user = $request->user();
+        $isAdmin = $user->hasRole('admin');
+
         // Summary statistics
         $totalVehicles = Vehicle::count();
         $availableVehicles = Vehicle::where('status', 'available')->count();
-        $rentedVehicles = Vehicle::where('status', 'rented')->count();
+        $rentedVehicles = Vehicle::where('status', 'in_use')->count();
         $maintenanceVehicles = Vehicle::where('status', 'maintenance')->count();
 
         $totalBookings = Booking::count();
-        $activeBookings = Booking::where('status', 'active')->count();
+        $activeBookings = Booking::where('status', 'released')->count();
         $completedBookings = Booking::where('status', 'completed')->count();
         $cancelledBookings = Booking::where('status', 'cancelled')->count();
 
@@ -35,31 +38,27 @@ class DashboardController extends Controller
         $startOfWeek = Carbon::now()->startOfWeek();
         $startOfMonth = Carbon::now()->startOfMonth();
 
-        // Revenue calculations based on approved rental payments, using booking's total_price
-        $revenueToday = Payment::where('status', 'approved')
-            ->where('type', 'rental')
-            ->whereDate('updated_at', $today)
-            ->with('booking')
-            ->get()
-            ->sum(function($payment) {
-                return $payment->booking?->total_price ?? 0;
-            });
-        $revenueWeek = Payment::where('status', 'approved')
-            ->where('type', 'rental')
-            ->whereBetween('updated_at', [$startOfWeek, Carbon::now()])
-            ->with('booking')
-            ->get()
-            ->sum(function($payment) {
-                return $payment->booking?->total_price ?? 0;
-            });
-        $revenueMonth = Payment::where('status', 'approved')
-            ->where('type', 'rental')
-            ->whereBetween('updated_at', [$startOfMonth, Carbon::now()])
-            ->with('booking')
-            ->get()
-            ->sum(function($payment) {
-                return $payment->booking?->total_price ?? 0;
-            });
+        // Revenue calculations optimized using joins instead of eager loading
+        $revenueToday = Payment::select('payments.*', 'bookings.total_price')
+            ->join('bookings', 'payments.booking_id', '=', 'bookings.id')
+            ->where('payments.status', 'approved')
+            ->where('payments.type', 'rental')
+            ->whereDate('payments.updated_at', $today)
+            ->sum('bookings.total_price');
+
+        $revenueWeek = Payment::select('payments.*', 'bookings.total_price')
+            ->join('bookings', 'payments.booking_id', '=', 'bookings.id')
+            ->where('payments.status', 'approved')
+            ->where('payments.type', 'rental')
+            ->whereBetween('payments.updated_at', [$startOfWeek, Carbon::now()])
+            ->sum('bookings.total_price');
+
+        $revenueMonth = Payment::select('payments.*', 'bookings.total_price')
+            ->join('bookings', 'payments.booking_id', '=', 'bookings.id')
+            ->where('payments.status', 'approved')
+            ->where('payments.type', 'rental')
+            ->whereBetween('payments.updated_at', [$startOfMonth, Carbon::now()])
+            ->sum('bookings.total_price');
 
         // Pending actions
         $pendingBookings = Booking::whereIn('status', ['pending', 'confirmed'])->count();
@@ -67,16 +66,32 @@ class DashboardController extends Controller
         $vehiclesToRelease = Booking::where('status', 'for_release')->count();
         $vehiclesToReturn = Booking::where('status', 'released')->where('end_date', '<', Carbon::now())->count();
 
-        // Recent activity
-        $recentBookings = Booking::with(['user', 'vehicle'])->latest()->take(5)->get();
-        $recentPayments = Payment::latest()->take(5)->get();
-        $recentFeedback = Feedback::with('user')->latest()->take(5)->get();
+        // Recent activity with selective fields
+        $recentBookings = Booking::select(['id', 'user_id', 'vehicle_id', 'status', 'created_at'])
+            ->with([
+                'user:id,name',
+                'vehicle:id,model'
+            ])
+            ->latest()
+            ->take(5)
+            ->get();
+
+        $recentPayments = Payment::select(['id', 'booking_id', 'type', 'status', 'method', 'created_at'])
+            ->latest()
+            ->take(5)
+            ->get();
+
+        $recentFeedback = Feedback::select(['id', 'user_id', 'comment', 'created_at'])
+            ->with('user:id,name')
+            ->latest()
+            ->take(5)
+            ->get();
 
         // Alerts
         $overdueReturns = Booking::where('status', 'released')->where('end_date', '<', Carbon::now())->count();
         $maintenanceDue = Vehicle::where('status', 'maintenance')->count();
 
-        return response()->json([
+        $response = [
             'summary' => [
                 'vehicles' => [
                     'total' => $totalVehicles,
@@ -89,12 +104,6 @@ class DashboardController extends Controller
                     'active' => $activeBookings,
                     'completed' => $completedBookings,
                     'cancelled' => $cancelledBookings,
-                ],
-                'users' => [
-                    'total' => $totalUsers,
-                    'customers' => $totalCustomers,
-                    'manager' => $totalStaff,
-                    'admins' => $totalAdmins,
                 ],
                 'revenue' => [
                     'today' => $revenueToday,
@@ -117,6 +126,18 @@ class DashboardController extends Controller
                 'overdue_returns' => $overdueReturns,
                 'maintenance_due' => $maintenanceDue,
             ],
-        ]);
+        ];
+
+        // Only include users data for admin role
+        if ($isAdmin) {
+            $response['summary']['users'] = [
+                'total' => $totalUsers,
+                'customers' => $totalCustomers,
+                'manager' => $totalStaff,
+                'admins' => $totalAdmins,
+            ];
+        }
+
+        return response()->json($response);
     }
 }
