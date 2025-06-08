@@ -18,6 +18,7 @@ class Booking extends Model
         'total_price',
         'notes',
         'driver_requested',
+        'driver_id', // <-- add this
         'pickup_type',
         'delivery_location',
         'delivery_details',
@@ -99,6 +100,11 @@ class Booking extends Model
     public function feedback()
     {
         return $this->hasMany(Feedback::class);
+    }
+
+    public function driver()
+    {
+        return $this->belongsTo(\App\Models\Driver::class);
     }
 
     /**

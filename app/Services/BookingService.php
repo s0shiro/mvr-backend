@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Booking;
 use App\Models\Vehicle;
+use App\Models\Driver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 
@@ -31,7 +32,33 @@ class BookingService
     }
 
     /**
-     * Create a booking if available.
+     * Find an available driver for the given period.
+     */
+    public function findAvailableDriver($startDate, $endDate)
+    {
+        // Only consider drivers who are active (ignore available flag)
+        $drivers = \App\Models\Driver::where('status', 'active')->get();
+        foreach ($drivers as $driver) {
+            $hasConflict = Booking::where('driver_id', $driver->id)
+                ->where('status', '!=', 'cancelled')
+                ->where(function ($query) use ($startDate, $endDate) {
+                    $query->whereBetween('start_date', [$startDate, $endDate])
+                        ->orWhereBetween('end_date', [$startDate, $endDate])
+                        ->orWhere(function ($q) use ($startDate, $endDate) {
+                            $q->where('start_date', '<=', $startDate)
+                                ->where('end_date', '>=', $endDate);
+                        });
+                })
+                ->exists();
+            if (!$hasConflict) {
+                return $driver;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Create a booking if available, and assign driver if requested.
      */
     public function createBooking($userId, $vehicleId, $startDate, $endDate, $notes = null, $driverRequested = false, $pickupType = 'pickup', $deliveryLocation = null, $deliveryDetails = null, $validIds = null)
     {
@@ -39,7 +66,6 @@ class BookingService
             return null; // Not available
         }
         $vehicle = Vehicle::findOrFail($vehicleId);
-        
         // Calculate delivery fee if applicable
         $deliveryFee = 0;
         if ($pickupType === 'delivery' && $deliveryLocation) {
@@ -51,6 +77,15 @@ class BookingService
         $end = Carbon::parse($endDate);
         $hours = $start->floatDiffInHours($end);
         $days = max(1, (int) ceil($hours / 24));
+        $driverId = null;
+        if ($driverRequested) {
+            $driver = $this->findAvailableDriver($startDate, $endDate);
+            if (!$driver) {
+                return null;
+            }
+            $driverId = $driver->id;
+            // No need to set available flag
+        }
         return Booking::create([
             'user_id' => $userId,
             'vehicle_id' => $vehicleId,
@@ -60,6 +95,7 @@ class BookingService
             'total_price' => $totalPrice + $deliveryFee,
             'notes' => $notes,
             'driver_requested' => $driverRequested,
+            'driver_id' => $driverId,
             'pickup_type' => $pickupType,
             'delivery_location' => $deliveryLocation,
             'delivery_details' => $deliveryDetails,

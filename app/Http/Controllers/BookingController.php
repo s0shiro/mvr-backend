@@ -57,7 +57,10 @@ class BookingController extends Controller
             $validated['valid_ids'] ?? null
         );
         if (!$booking) {
-            return response()->json(['message' => 'Vehicle not available for selected dates'], 409);
+            $msg = ($validated['driver_requested'] ?? false)
+                ? 'No driver available for selected dates'
+                : 'Vehicle not available for selected dates';
+            return response()->json(['message' => $msg], 409);
         }
 
         // Send notification to admins
@@ -70,7 +73,7 @@ class BookingController extends Controller
             'booking_id' => $booking->id
         ]);
 
-        return response()->json(['message' => 'Booking created', 'booking' => $booking], 201);
+        return response()->json(['message' => 'Booking created', 'booking' => $booking->load('driver')], 201);
     }
 
     /**
@@ -104,8 +107,16 @@ class BookingController extends Controller
             $deliveryFee = Booking::DELIVERY_FEES[$request->input('delivery_location')] ?? 0;
         }
 
+        // Check driver availability if requested
+        $driverAvailable = true;
+        if ($driverRequested) {
+            $driver = $this->bookingService->findAvailableDriver($validated['start_date'], $validated['end_date']);
+            $driverAvailable = $driver !== null;
+        }
+
         return response()->json([
             'available' => !$hasConflict,
+            'driver_available' => $driverAvailable,
             'total_price' => $price + $deliveryFee,
             'rental_rate' => $driverRequested ? $vehicle->rental_rate_with_driver : $vehicle->rental_rate,
             'with_driver' => $driverRequested,
@@ -207,6 +218,8 @@ class BookingController extends Controller
         $booking->refund_rate = $refund;
         $booking->refund_amount = $refundAmount;
         $booking->save();
+        // Set driver available again
+        app(\App\Services\BookingService::class)->setDriverAvailable($booking);
         return response()->json([
             'message' => 'Booking cancelled',
             'refund_rate' => $refund,

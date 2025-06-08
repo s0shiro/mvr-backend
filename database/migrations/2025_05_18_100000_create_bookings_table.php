@@ -11,8 +11,8 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('vehicle_id')->constrained()->onDelete('cascade');
-            $table->dateTime('start_date');
-            $table->dateTime('end_date');
+            $table->timestampTz('start_date');
+            $table->timestampTz('end_date');
             $table->enum('status', ['pending', 'confirmed', 'for_release', 'released', 'cancelled', 'completed'])->default('pending');
             $table->decimal('total_price', 10, 2)->nullable();
             $table->text('notes')->nullable();

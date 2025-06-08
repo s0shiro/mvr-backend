@@ -129,6 +129,18 @@ Route::middleware(['auth:api', 'role:admin'])->group(function () {
     Route::delete('/businesses/{business}/sales/{id}', [App\Http\Controllers\BusinessSaleController::class, 'destroy']);
 });
 
+// Driver routes
+Route::controller(App\Http\Controllers\DriverController::class)
+    ->middleware(['auth:api', 'role:admin|manager'])
+    ->prefix('drivers')
+    ->group(function () {
+        Route::get('/', 'index');
+        Route::get('/{id}', 'show');
+        Route::post('/', 'store');
+        Route::put('/{id}', 'update');
+        Route::delete('/{id}', 'destroy');
+    });
+
 // Admin dashboard overview
 Route::middleware(['auth:api', 'role:admin|manager'])->get('/admin/overview', [\App\Http\Controllers\DashboardController::class, 'adminOverview']);
 

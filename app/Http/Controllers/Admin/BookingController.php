@@ -227,6 +227,15 @@ class BookingController extends Controller
         $vehicle->status = 'available'; // Always set to available after return
         $vehicle->save();
 
+        // Make driver available again if assigned
+        if ($booking->driver_id) {
+            $driver = \App\Models\Driver::find($booking->driver_id);
+            if ($driver) {
+                $driver->available = true;
+                $driver->save();
+            }
+        }
+
         return response()->json(['message' => 'Vehicle returned', 'return' => $return]);
     }
 }
