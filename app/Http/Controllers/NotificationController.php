@@ -21,12 +21,16 @@ class NotificationController extends Controller
     public function index(Request $request)
     {
         $unreadOnly = $request->boolean('unread', false);
+        $cursor = $request->input('cursor');
+        $limit = $request->input('limit', 5);
         $notifications = $this->notificationService->getUserNotifications(
             Auth::user(),
-            $unreadOnly
+            $unreadOnly,
+            $cursor,
+            $limit
         );
 
-        return response()->json(['notifications' => $notifications]);
+        return response()->json($notifications);
     }
 
     /**
@@ -47,5 +51,14 @@ class NotificationController extends Controller
     {
         $this->notificationService->markAllAsRead(Auth::user());
         return response()->json(['message' => 'All notifications marked as read']);
+    }
+
+    /**
+     * Get unread notification count for the authenticated user
+     */
+    public function unreadCount()
+    {
+        $count = $this->notificationService->getUnreadCount(Auth::user());
+        return response()->json(['unread_count' => $count]);
     }
 }

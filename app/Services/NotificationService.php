@@ -94,19 +94,73 @@ class NotificationService
     }
 
     /**
-     * Get notifications for a user
+     * Get notifications for a user (cursor-based, returns only necessary fields)
+     * @param User $user
+     * @param bool $unreadOnly
+     * @param int|null $cursor Notification ID to start after (for pagination)
+     * @param int $limit Number of notifications to return
+     * @return array
      */
-    public function getUserNotifications(User $user, bool $unreadOnly = false)
+    public function getUserNotifications(User $user, bool $unreadOnly = false, ?int $cursor = null, int $limit = 5)
     {
         $query = Notification::where('user_id', $user->id)
             ->with('notifiable')
-            ->orderByDesc('created_at');
+            ->orderByDesc('id');
 
         if ($unreadOnly) {
             $query->unread();
         }
+        if ($cursor) {
+            $query->where('id', '<', $cursor);
+        }
 
-        return $query->get();
+        $notifications = $query->limit($limit + 1)
+            ->get(['id', 'type', 'data', 'read_at', 'created_at', 'notifiable_type', 'notifiable_id']);
+
+        $hasMore = $notifications->count() > $limit;
+        $items = $notifications->take($limit);
+
+        $result = $items->map(function ($notification) {
+            $notifiable = $notification->notifiable;
+            $notifiableData = null;
+            if ($notifiable && is_object($notifiable)) {
+                if ($notification->notifiable_type === 'App\\Models\\Payment') {
+                    $notifiableData = [
+                        'id' => $notifiable->id,
+                        'booking_id' => $notifiable->booking_id ?? null,
+                        'status' => $notifiable->status ?? null,
+                        'type' => $notifiable->type ?? null,
+                        'method' => $notifiable->method ?? null,
+                        'approved_at' => $notifiable->approved_at ?? null,
+                    ];
+                } elseif ($notification->notifiable_type === 'App\\Models\\Booking') {
+                    $notifiableData = [
+                        'id' => $notifiable->id,
+                        'status' => $notifiable->status ?? null,
+                        'type' => $notifiable->type ?? null,
+                        'approved_at' => $notifiable->approved_at ?? null,
+                    ];
+                }
+            }
+            return [
+                'id' => $notification->id,
+                'type' => $notification->type,
+                'data' => $notification->data,
+                'read_at' => $notification->read_at,
+                'created_at' => $notification->created_at,
+                'notifiable_type' => $notification->notifiable_type,
+                'notifiable_id' => $notification->notifiable_id,
+                'notifiable' => $notifiableData,
+            ];
+        });
+
+        $nextCursor = $hasMore ? $items->last()->id : null;
+
+        return [
+            'notifications' => $result->values(),
+            'next_cursor' => $nextCursor,
+            'has_more' => $hasMore
+        ];
     }
 
     /**

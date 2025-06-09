@@ -54,6 +54,7 @@ Route::controller(NotificationController::class)->middleware(['auth:api'])->grou
     Route::get('/notifications', 'index');
     Route::post('/notifications/{id}/read', 'markAsRead');
     Route::post('/notifications/mark-all-read', 'markAllAsRead');
+    Route::get('/notifications/unread-count', 'unreadCount'); // Unread notification count
 });
 
 // Booking routes

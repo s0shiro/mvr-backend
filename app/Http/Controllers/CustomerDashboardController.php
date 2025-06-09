@@ -54,8 +54,13 @@ class CustomerDashboardController extends Controller
         $recentPayments = $this->paymentService->getRecentPayments($user->id, 5);
 
         // Recent notifications (last 5)
-        $recentNotifications = $this->notificationService->getUserNotifications($user, true)
-            ->take(5);
+        $notificationsResult = $this->notificationService->getUserNotifications($user, true);
+        $recentNotifications = $notificationsResult['notifications'];
+        if ($recentNotifications instanceof \Illuminate\Support\Collection) {
+            $recentNotifications = $recentNotifications->take(5)->values(); // values() to reindex
+        } else {
+            $recentNotifications = array_slice($recentNotifications, 0, 5);
+        }
 
         return response()->json([
             'stats' => $stats,
