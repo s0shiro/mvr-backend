@@ -97,6 +97,7 @@ Route::middleware(['auth:api', 'role:admin|manager'])->prefix('admin')->group(fu
     Route::get('/bookings/for-return', [App\Http\Controllers\Admin\BookingController::class, 'forReturn']);
     Route::post('/bookings/{booking}/return', [App\Http\Controllers\Admin\BookingController::class, 'returnVehicle']);
     Route::get('/bookings/completed', [App\Http\Controllers\Admin\BookingController::class, 'completed']); // Completed bookings history
+    Route::get('/bookings/{booking}', [App\Http\Controllers\Admin\BookingController::class, 'show']); // Get a specific booking by ID
 
     // User management routes
     Route::get('/users', [App\Http\Controllers\Admin\UserController::class, 'index']);

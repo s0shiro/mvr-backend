@@ -12,7 +12,7 @@ class AssignRolesToUsersSeeder extends Seeder
     {
         // Assign roles to example users (customize as needed)
         $adminUser = User::firstOrCreate([
-            'email' => 'mascarinas022@gmail.com',
+            'email' => 'rimuruuu021@gmail.com',
         ], [
             'username' => 'admin',
             'name' => 'Admin User',
@@ -24,7 +24,7 @@ class AssignRolesToUsersSeeder extends Seeder
 
         // Example: create and assign a manager
         $managerUser = User::firstOrCreate([
-            'email' => 'manager@example.com',
+            'email' => 'rimuruuu022@gmail.com',
         ], [
             'username' => 'manager',
             'name' => 'Manager User',
@@ -36,7 +36,7 @@ class AssignRolesToUsersSeeder extends Seeder
 
         // Example: create and assign a customer
         $customerUser = User::firstOrCreate([
-            'email' => 'customer@example.com',
+            'email' => 'mascarinas033@gmail.com',
         ], [
             'username' => 'customer',
             'name' => 'Customer User',

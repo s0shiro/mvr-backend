@@ -67,7 +67,8 @@ class PaymentController extends Controller
             'customer_name' => Auth::user()->name,
             'booking_id' => $booking->id,
             'payment_type' => $type,
-            'payment_method' => $validated['method']
+            'payment_method' => $validated['method'],
+            'frontend_url' => "/admin/bookings/$bookingId"
         ]);
 
         return response()->json(['message' => ucfirst($type).' payment submitted', 'payment' => $payment], 201);

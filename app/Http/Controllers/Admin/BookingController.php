@@ -14,12 +14,38 @@ class BookingController extends Controller
      */
     public function index()
     {
-        $bookings = Booking::with(['user', 'vehicle', 'payments', 'vehicleRelease'])
+        $bookings = Booking::with(['user:id,name', 'vehicle.primaryImage'])
             ->whereIn('status', ['pending', 'confirmed'])
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return response()->json(['bookings' => $bookings]);
+        $summaries = $bookings->map(function ($booking) {
+            // Check for any pending payment
+            $hasPendingPayment = $booking->payments()->where('status', 'pending')->exists();
+            return [
+                'id' => $booking->id,
+                'status' => $booking->status,
+                'start_date' => $booking->start_date,
+                'end_date' => $booking->end_date,
+                'total_price' => $booking->total_price,
+                'pickup_type' => $booking->pickup_type,
+                'delivery_location' => $booking->delivery_location,
+                'delivery_details' => $booking->delivery_details,
+                'created_at' => $booking->created_at,
+                'has_pending_payment' => $hasPendingPayment,
+                'user' => $booking->user ? [
+                    'id' => $booking->user->id,
+                    'name' => $booking->user->name,
+                ] : null,
+                'vehicle' => $booking->vehicle ? [
+                    'id' => $booking->vehicle->id,
+                    'name' => $booking->vehicle->name,
+                    'primary_image_url' => $booking->vehicle->primary_image_url ?? null,
+                ] : null,
+            ];
+        });
+
+        return response()->json(['bookings' => $summaries]);
     }
 
     /**
@@ -237,5 +263,25 @@ class BookingController extends Controller
         }
 
         return response()->json(['message' => 'Vehicle returned', 'return' => $return]);
+    }
+
+    /**
+     * Show a specific booking with all details for admin
+     */
+    public function show(Booking $booking)
+    {
+        $booking->load(['user', 'vehicle', 'payments', 'vehicleRelease', 'vehicleReturn', 'driver']);
+        $data = $booking->toArray();
+        // Attach driver info if present
+        if ($booking->driver) {
+            $data['driver'] = [
+                'id' => $booking->driver->id,
+                'name' => $booking->driver->name,
+                'phone' => $booking->driver->phone ?? null,
+            ];
+        } else {
+            $data['driver'] = null;
+        }
+        return response()->json(['booking' => $data]);
     }
 }
