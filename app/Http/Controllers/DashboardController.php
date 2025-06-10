@@ -67,14 +67,30 @@ class DashboardController extends Controller
         $vehiclesToReturn = Booking::where('status', 'released')->where('end_date', '<', Carbon::now())->count();
 
         // Recent activity with selective fields
-        $recentBookings = Booking::select(['id', 'user_id', 'vehicle_id', 'status', 'created_at'])
+        $recentBookings = Booking::select(['id', 'user_id', 'status', 'created_at', 'start_date', 'end_date', 'total_price', 'notes', 'driver_requested', 'driver_id', 'pickup_type', 'delivery_location', 'delivery_details', 'delivery_fee', 'days', 'refund_rate', 'refund_amount'])
             ->with([
-                'user:id,name',
-                'vehicle:id,model'
+                'user:id,name'
             ])
             ->latest()
             ->take(5)
-            ->get();
+            ->get()
+            ->map(function ($booking) {
+                return [
+                    'id' => $booking->id,
+                    'status' => $booking->status,
+                    'start_date' => $booking->start_date,
+                    'end_date' => $booking->end_date,
+                    'driver_requested' => $booking->driver_requested,
+                    'pickup_type' => $booking->pickup_type,
+                    'delivery_fee' => $booking->delivery_fee,
+                    'days' => $booking->days,
+                    'user' => $booking->user ? [
+                        'id' => $booking->user->id,
+                        'name' => $booking->user->name,
+                        'role' => $booking->user->role ?? null,
+                    ] : null
+                ];
+            });
 
         $recentPayments = Payment::select(['id', 'booking_id', 'type', 'status', 'method', 'created_at'])
             ->latest()
