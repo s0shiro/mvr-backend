@@ -6,9 +6,19 @@ use App\Models\Driver;
 
 class DriverService
 {
-    public function getAll()
+    public function getAll($perPage = 10, $search = null)
     {
-        return Driver::all();
+        $query = Driver::query();
+        if ($search) {
+            $search = strtolower($search);
+            $query->where(function($q) use ($search) {
+                $q->whereRaw('LOWER(name) LIKE ?', ["%$search%"])
+                  ->orWhereRaw('LOWER(phone) LIKE ?', ["%$search%"])
+                  ->orWhereRaw('LOWER(email) LIKE ?', ["%$search%"])
+                  ->orWhereRaw('LOWER(status) LIKE ?', ["%$search%"]);
+            });
+        }
+        return $query->paginate($perPage);
     }
 
     public function getById($id)

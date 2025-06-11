@@ -11,30 +11,12 @@ class BusinessSaleController extends Controller
     // List all sales/notes for a business with cursor-based pagination
     public function index(Request $request, $businessId)
     {
-        $limit = 10;
-        $cursor = $request->input('cursor');
+        $perPage = $request->query('per_page', 10);
+        $page = $request->query('page', 1);
         $query = BusinessSale::where('business_id', $businessId)->orderBy('date', 'desc')->orderBy('id', 'desc');
-        if ($cursor) {
-            // Assuming cursor is a composite of date|id for uniqueness
-            [$date, $id] = explode('|', $cursor);
-            $query->where(function($q) use ($date, $id) {
-                $q->where('date', '<', $date)
-                  ->orWhere(function($q2) use ($date, $id) {
-                      $q2->where('date', $date)->where('id', '<', $id);
-                  });
-            });
-        }
-        $sales = $query->limit($limit + 1)->get();
-        $nextCursor = null;
-        if ($sales->count() > $limit) {
-            $last = $sales->slice($limit, 1)->first();
-            $nextCursor = $last->date . '|' . $last->id;
-            $sales = $sales->slice(0, $limit);
-        }
-        return response()->json([
-            'data' => $sales->values(),
-            'next_cursor' => $nextCursor,
-        ]);
+        // Optionally, add search support here if needed in the future
+        $sales = $query->paginate($perPage, ['*'], 'page', $page);
+        return response()->json($sales);
     }
 
     // Store a new sale/note

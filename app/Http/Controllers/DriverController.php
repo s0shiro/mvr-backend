@@ -14,9 +14,12 @@ class DriverController extends Controller
         $this->driverService = $driverService;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json($this->driverService->getAll());
+        $perPage = $request->query('per_page', 10);
+        $search = $request->query('search');
+        $drivers = $this->driverService->getAll($perPage, $search);
+        return response()->json($drivers);
     }
 
     public function show($id)
