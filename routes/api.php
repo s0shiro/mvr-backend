@@ -90,6 +90,7 @@ Route::controller(FeedbackController::class)
 
 // Admin routes
 Route::middleware(['auth:api', 'role:admin|manager'])->prefix('admin')->group(function () {
+    Route::get('/bookings/calendar', [App\Http\Controllers\Admin\BookingController::class, 'calendar']); // Get calendar events
     Route::get('/bookings', [App\Http\Controllers\Admin\BookingController::class, 'index']);
     Route::post('/bookings/payments/{paymentId}/confirm', [App\Http\Controllers\Admin\BookingController::class, 'confirmPayment']);
     Route::post('/bookings/payments/{paymentId}/reject', [App\Http\Controllers\Admin\BookingController::class, 'rejectPayment']);

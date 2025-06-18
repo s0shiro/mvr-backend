@@ -87,7 +87,7 @@ class BookingController extends Controller
             'end_date' => 'required|date|after:start_date',
             'driver_requested' => 'boolean',
         ]);
-        $hasConflict = $this->bookingService->isAvailable(
+        $hasConflict = !$this->bookingService->isAvailable(
             $validated['vehicle_id'],
             $validated['start_date'],
             $validated['end_date']

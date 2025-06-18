@@ -9,6 +9,13 @@ use Illuminate\Http\Request;
 
 class BookingController extends Controller
 {
+    protected $bookingService;
+
+    public function __construct(\App\Services\BookingService $bookingService)
+    {
+        $this->bookingService = $bookingService;
+    }
+
     /**
      * List all bookings with their payments and vehicle details
      */
@@ -233,8 +240,8 @@ class BookingController extends Controller
 
         // Calculate late fee if not provided
         $lateFee = $validated['late_fee'] ?? 0;
-        $scheduledEnd = $booking->end_date;
-        $actualReturn = isset($validated['returned_at']) ? now()->parse($validated['returned_at']) : now();
+        $scheduledEnd = \Carbon\Carbon::parse($booking->end_date);
+        $actualReturn = isset($validated['returned_at']) ? \Carbon\Carbon::parse($validated['returned_at']) : now();
         if ($actualReturn->greaterThan($scheduledEnd)) {
             $hoursLate = $scheduledEnd->diffInHours($actualReturn);
             $lateFee = $lateFee ?: ($hoursLate * 100); // ₱100/hour late fee
@@ -283,5 +290,23 @@ class BookingController extends Controller
             $data['driver'] = null;
         }
         return response()->json(['booking' => $data]);
+    }
+
+    /**
+     * Get bookings for calendar view
+     */
+    public function calendar(Request $request)
+    {
+        $validated = $request->validate([
+            'start' => 'required|date',
+            'end' => 'required|date|after_or_equal:start'
+        ]);
+        
+        $startDate = $validated['start'];
+        $endDate = $validated['end'];
+        
+        $events = $this->bookingService->getCalendarEvents($startDate, $endDate);
+        
+        return response()->json(['events' => $events]);
     }
 }

@@ -20,7 +20,8 @@ class BookingService
         if ($excludeBookingId) {
             $query->where('id', '!=', $excludeBookingId);
         }
-        return $query->where(function ($query) use ($startDate, $endDate) {
+        // Check for any overlapping bookings
+        $hasConflict = $query->where(function ($query) use ($startDate, $endDate) {
                 $query->whereBetween('start_date', [$startDate, $endDate])
                       ->orWhereBetween('end_date', [$startDate, $endDate])
                       ->orWhere(function ($q) use ($startDate, $endDate) {
@@ -29,6 +30,9 @@ class BookingService
                       });
             })
             ->exists();
+        
+        // Return true if there are no conflicts
+        return !$hasConflict;
     }
 
     /**
@@ -62,8 +66,8 @@ class BookingService
      */
     public function createBooking($userId, $vehicleId, $startDate, $endDate, $notes = null, $driverRequested = false, $pickupType = 'pickup', $deliveryLocation = null, $deliveryDetails = null, $validIds = null)
     {
-        if ($this->isAvailable($vehicleId, $startDate, $endDate)) {
-            return null; // Not available
+        if (!$this->isAvailable($vehicleId, $startDate, $endDate)) {
+            return null; // Not available, conflict exists
         }
         $vehicle = Vehicle::findOrFail($vehicleId);
         // Calculate delivery fee if applicable
@@ -153,5 +157,56 @@ class BookingService
             ->with('vehicle')
             ->latest()
             ->get();
+    }
+
+    /**
+     * Get calendar events for the specified date range
+     */
+    public function getCalendarEvents($startDate, $endDate)
+    {
+        $bookings = Booking::with(['user:id,name', 'vehicle:id,name,brand,model'])
+            ->where(function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('start_date', [$startDate, $endDate])
+                      ->orWhereBetween('end_date', [$startDate, $endDate])
+                      ->orWhere(function ($q) use ($startDate, $endDate) {
+                          $q->where('start_date', '<=', $startDate)
+                            ->where('end_date', '>=', $endDate);
+                      });
+            })
+            ->orderBy('start_date')
+            ->get();
+
+        return $bookings->map(function ($booking) {
+            $color = match($booking->status) {
+                'pending' => '#fbbf24', // Amber
+                'confirmed' => '#60a5fa', // Blue
+                'for_release' => '#34d399', // Green
+                'released' => '#818cf8', // Indigo
+                'cancelled' => '#f87171', // Red
+                'completed' => '#a3e635', // Lime
+                default => '#9ca3af', // Gray
+            };
+
+            return [
+                'id' => $booking->id,
+                'title' => "{$booking->vehicle->name} - {$booking->user->name}",
+                'start' => $booking->start_date,
+                'end' => $booking->end_date,
+                'color' => $color,
+                'extendedProps' => [
+                    'status' => $booking->status,
+                    'vehicle' => [
+                        'id' => $booking->vehicle->id,
+                        'name' => $booking->vehicle->name,
+                        'brand' => $booking->vehicle->brand,
+                        'model' => $booking->vehicle->model,
+                    ],
+                    'customer' => [
+                        'id' => $booking->user->id,
+                        'name' => $booking->user->name,
+                    ]
+                ]
+            ];
+        });
     }
 }
