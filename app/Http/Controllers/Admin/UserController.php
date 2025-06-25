@@ -8,15 +8,18 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 use App\Services\UserService;
+use App\Services\NotificationService;
 
 class UserController extends Controller
 {
     // List users with cursor-based pagination
     protected $userService;
+    protected $notificationService;
 
-    public function __construct(UserService $userService)
+    public function __construct(UserService $userService, NotificationService $notificationService)
     {
         $this->userService = $userService;
+        $this->notificationService = $notificationService;
     }
 
     public function index(Request $request)
@@ -54,16 +57,35 @@ class UserController extends Controller
             'name' => 'required|string',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
-            'role' => 'required|string|exists:roles,name',
+            'role' => 'required|string|in:admin,manager', // Only allow admin and manager
         ]);
+
+        // Generate verification code and expiry
+        $verificationCode = random_int(100000, 999999);
+        $expiresAt = now()->addMinutes(10);
 
         $user = User::create([
             'username' => $validated['username'],
             'name' => $validated['name'],
             'email' => $validated['email'],
+            'address' => $request->input('address', ''), // Provide default empty string if not set
             'password' => Hash::make($validated['password']),
+            'verification_code' => $verificationCode,
+            'verification_code_expires_at' => $expiresAt,
         ]);
         $user->assignRole($validated['role']);
+
+        // Use NotificationService to send verification email
+        $this->notificationService->notifyUser(
+            $user->id,
+            'user_verification',
+            $user,
+            [
+                'message' => "Your verification code is: $verificationCode",
+                'verification_code' => $verificationCode,
+                'expires_at' => $expiresAt,
+            ]
+        );
 
         return response()->json($user, 201);
     }

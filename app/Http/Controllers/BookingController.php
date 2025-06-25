@@ -218,8 +218,6 @@ class BookingController extends Controller
         $booking->refund_rate = $refund;
         $booking->refund_amount = $refundAmount;
         $booking->save();
-        // Set driver available again
-        app(\App\Services\BookingService::class)->setDriverAvailable($booking);
         return response()->json([
             'message' => 'Booking cancelled',
             'refund_rate' => $refund,

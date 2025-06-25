@@ -94,6 +94,7 @@ Route::middleware(['auth:api', 'role:admin|manager'])->prefix('admin')->group(fu
     Route::get('/bookings', [App\Http\Controllers\Admin\BookingController::class, 'index']);
     Route::post('/bookings/payments/{paymentId}/confirm', [App\Http\Controllers\Admin\BookingController::class, 'confirmPayment']);
     Route::post('/bookings/payments/{paymentId}/reject', [App\Http\Controllers\Admin\BookingController::class, 'rejectPayment']);
+    Route::post('/bookings/{booking}/cancel', [App\Http\Controllers\Admin\BookingController::class, 'cancel']); // Admin cancel booking
     Route::post('/bookings/{booking}/release', [App\Http\Controllers\Admin\BookingController::class, 'releaseVehicle']); // Confirm vehicle release
     Route::get('/bookings/for-release', [App\Http\Controllers\Admin\BookingController::class, 'forRelease']);
     Route::get('/bookings/for-return', [App\Http\Controllers\Admin\BookingController::class, 'forReturn']);

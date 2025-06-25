@@ -5,15 +5,18 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Payment;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class BookingController extends Controller
 {
     protected $bookingService;
+    protected $notificationService;
 
-    public function __construct(\App\Services\BookingService $bookingService)
+    public function __construct(\App\Services\BookingService $bookingService, NotificationService $notificationService)
     {
         $this->bookingService = $bookingService;
+        $this->notificationService = $notificationService;
     }
 
     /**
@@ -308,5 +311,54 @@ class BookingController extends Controller
         $events = $this->bookingService->getCalendarEvents($startDate, $endDate);
         
         return response()->json(['events' => $events]);
+    }
+
+    /**
+     * Cancel a booking (Admin)
+     */
+    public function cancel(Request $request, $bookingId)
+    {
+        $booking = Booking::findOrFail($bookingId);
+        
+        // Only allow cancellation if not already cancelled or completed
+        if (in_array($booking->status, ['cancelled', 'completed'])) {
+            return response()->json(['message' => 'Booking cannot be cancelled'], 422);
+        }
+        
+        // Admin cancellation logic: calculate refund based on timing
+        $hours = now()->diffInHours($booking->start_date, false);
+        $refund = 0;
+        if ($hours >= 168) { // 7 days
+            $refund = 1.0;
+        } elseif ($hours >= 24) {
+            $refund = 0.5;
+        }
+        
+        // Refund is based on the vehicle's deposit, not total_price
+        $vehicle = $booking->vehicle;
+        $deposit = $vehicle ? $vehicle->deposit : 0;
+        $refundAmount = $deposit * $refund;
+        
+        $booking->status = 'cancelled';
+        $booking->refund_rate = $refund;
+        $booking->refund_amount = $refundAmount;
+        $booking->save();
+        
+        // Send notification to the customer about admin cancellation
+        $this->notificationService->create('booking_cancelled_by_admin', $booking, [
+            'message' => 'Your booking has been cancelled by admin',
+            'vehicle_name' => $booking->vehicle->name ?? 'Unknown Vehicle',
+            'start_date' => $booking->start_date,
+            'end_date' => $booking->end_date,
+            'refund_rate' => $refund,
+            'refund_amount' => $refundAmount,
+            'booking_id' => $booking->id
+        ], $booking->user);
+        
+        return response()->json([
+            'message' => 'Booking cancelled',
+            'refund_rate' => $refund,
+            'refund_amount' => $refundAmount,
+        ]);
     }
 }
