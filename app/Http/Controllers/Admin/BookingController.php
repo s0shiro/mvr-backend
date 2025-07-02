@@ -26,6 +26,7 @@ class BookingController extends Controller
     {
         $bookings = Booking::with(['user:id,name', 'vehicle.primaryImage'])
             ->whereIn('status', ['pending', 'confirmed'])
+            ->orderBy('start_date', 'asc')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -65,6 +66,7 @@ class BookingController extends Controller
     {
         $bookings = Booking::with(['user', 'vehicle', 'payments', 'vehicleRelease'])
             ->where('status', 'for_release')
+            ->orderBy('start_date', 'asc')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -78,6 +80,7 @@ class BookingController extends Controller
     {
         $bookings = Booking::with(['user', 'vehicle', 'payments', 'vehicleRelease', 'vehicleReturn'])
             ->where('status', 'released')
+            ->orderBy('end_date', 'asc')
             ->orderBy('created_at', 'desc')
             ->get();
 
