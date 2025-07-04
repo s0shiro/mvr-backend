@@ -101,6 +101,19 @@ class BookingController extends Controller
     }
 
     /**
+     * List canceled bookings (status = 'cancelled') for admin history
+     */
+    public function canceled()
+    {
+        $bookings = Booking::with(['user', 'vehicle', 'payments'])
+            ->where('status', 'cancelled')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json(['bookings' => $bookings]);
+    }
+
+    /**
      * Confirm a payment
      */
     public function confirmPayment($paymentId)
