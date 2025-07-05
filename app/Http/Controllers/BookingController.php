@@ -232,6 +232,7 @@ class BookingController extends Controller
     {
         $userId = Auth::id();
         $bookings = Booking::where('user_id', $userId)
+            ->where('status', '!=', 'completed')
             ->with([
                 'vehicle',
                 'payments',
