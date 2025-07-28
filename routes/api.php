@@ -9,6 +9,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\CustomerDashboardController;
+use App\Http\Controllers\RentalPaymentController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -132,6 +133,13 @@ Route::middleware(['auth:api', 'role:admin'])->group(function () {
     Route::get('/businesses/{business}/sales/{id}', [App\Http\Controllers\BusinessSaleController::class, 'show']);
     Route::put('/businesses/{business}/sales/{id}', [App\Http\Controllers\BusinessSaleController::class, 'update']);
     Route::delete('/businesses/{business}/sales/{id}', [App\Http\Controllers\BusinessSaleController::class, 'destroy']);
+});
+
+// Rental payment routes (admin only)
+Route::middleware(['auth:api', 'role:admin'])->prefix('rental')->group(function () {
+    Route::get('/payments', [RentalPaymentController::class, 'index']);
+    Route::get('/revenue', [RentalPaymentController::class, 'revenue']);
+    Route::get('/payments/summary', [RentalPaymentController::class, 'summary']);
 });
 
 // Driver routes

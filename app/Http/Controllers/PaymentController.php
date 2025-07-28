@@ -38,7 +38,11 @@ class PaymentController extends Controller
                     }
                 },
             ],
-            'reference_number' => 'required|string',
+            'reference_number' => [
+                'required',
+                'string',
+                'unique:payments,reference_number',
+            ],
             'proof_image' => 'required|string', // base64
             'type' => 'in:deposit,rental', // optional, default to deposit
         ]);
