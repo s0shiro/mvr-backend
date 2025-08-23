@@ -27,6 +27,27 @@ class Booking extends Model
         'days', // Number of days for the booking
         'refund_rate', // Refund rate applied on cancellation
         'refund_amount', // Refund amount applied on cancellation
+        // Cancellation tracking fields
+        'cancelled_at',
+        'cancellation_reason',
+        'refund_status',
+        'refund_processed_at',
+        'refund_notes',
+        'refund_proof',
+        // Customer refund account information
+        'refund_method',
+        'refund_account_number',
+        'refund_account_name',
+        'refund_bank_name',
+        'refund_customer_notes',
+    ];
+
+    protected $casts = [
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
+        'cancelled_at' => 'datetime',
+        'refund_processed_at' => 'datetime',
+        'valid_ids' => 'array',
     ];
 
     const DELIVERY_FEES = [

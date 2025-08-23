@@ -74,12 +74,12 @@ class BookingController extends Controller
     }
 
     /**
-     * List bookings ready for vehicle return (status = 'released')
+     * List bookings ready for vehicle return (status = 'released' or 'pending_return')
      */
     public function forReturn()
     {
         $bookings = Booking::with(['user', 'vehicle', 'payments', 'vehicleRelease', 'vehicleReturn'])
-            ->where('status', 'released')
+            ->whereIn('status', ['released', 'pending_return'])
             ->orderBy('end_date', 'asc')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -250,12 +250,21 @@ class BookingController extends Controller
             'late_fee' => 'nullable|numeric',
             'damage_fee' => 'nullable|numeric',
             'cleaning_fee' => 'nullable|numeric',
+            // Deposit refund fields
+            'deposit_status' => 'nullable|in:pending,refunded,withheld',
+            'deposit_refund_amount' => 'nullable|numeric|min:0',
+            'deposit_refund_notes' => 'nullable|string',
+            'deposit_refund_proof' => 'nullable|array',
+            'deposit_refund_proof.*' => 'nullable|string',
+            'refund_method' => 'nullable|string',
         ]);
 
-        // Only allow return if booking is released and not already returned
-        if ($booking->status !== 'released' || $booking->vehicleReturn) {
-            return response()->json(['message' => 'Booking not eligible for return or already returned'], 422);
+        // Allow return processing if booking is released (admin uploads) or pending_return (customer submitted)
+        if (!in_array($booking->status, ['released', 'pending_return'])) {
+            return response()->json(['message' => 'Booking not eligible for return processing'], 422);
         }
+
+        $existingReturn = $booking->vehicleReturn;
 
         // Calculate late fee if not provided
         $lateFee = $validated['late_fee'] ?? 0;
@@ -266,11 +275,44 @@ class BookingController extends Controller
             $lateFee = $lateFee ?: ($hoursLate * 100); // ₱100/hour late fee
         }
 
-        $return = $booking->vehicleReturn()->create(array_merge($validated, [
-            'vehicle_id' => $booking->vehicle_id,
-            'returned_at' => $validated['returned_at'] ?? now(),
-            'late_fee' => $lateFee,
-        ]));
+        // Calculate deposit refund amount if not provided
+        $depositAmount = $booking->vehicle->deposit ?? 0;
+        $totalFees = $lateFee + ($validated['damage_fee'] ?? 0) + ($validated['cleaning_fee'] ?? 0);
+        $defaultRefundAmount = max(0, $depositAmount - $totalFees);
+        
+        $depositData = [];
+        if (isset($validated['deposit_status'])) {
+            $depositData['deposit_status'] = $validated['deposit_status'];
+            $depositData['deposit_refund_amount'] = $validated['deposit_refund_amount'] ?? $defaultRefundAmount;
+            $depositData['deposit_refund_notes'] = $validated['deposit_refund_notes'];
+            $depositData['deposit_refund_proof'] = $validated['deposit_refund_proof'];
+            $depositData['refund_method'] = $validated['refund_method'];
+            
+            if ($validated['deposit_status'] === 'refunded') {
+                $depositData['deposit_refunded_at'] = now();
+            }
+        }
+
+        if ($existingReturn) {
+            // Update existing return (from customer submission) with admin assessment
+            $existingReturn->update(array_merge($validated, $depositData, [
+                'returned_at' => $validated['returned_at'] ?? $existingReturn->returned_at,
+                'late_fee' => $lateFee,
+                'status' => 'completed',
+                'admin_processed_at' => now(),
+            ]));
+            $return = $existingReturn;
+        } else {
+            // Create new return (admin direct processing)
+            $return = $booking->vehicleReturn()->create(array_merge($validated, $depositData, [
+                'vehicle_id' => $booking->vehicle_id,
+                'returned_at' => $validated['returned_at'] ?? now(),
+                'late_fee' => $lateFee,
+                'status' => 'completed',
+                'admin_processed_at' => now(),
+                'deposit_status' => $validated['deposit_status'] ?? 'pending',
+            ]));
+        }
 
         // Update booking and vehicle status
         $booking->status = 'completed';
@@ -288,7 +330,97 @@ class BookingController extends Controller
             }
         }
 
-        return response()->json(['message' => 'Vehicle returned', 'return' => $return]);
+        // Notify customer about return completion
+        $notificationData = [
+            'message' => 'Your vehicle return has been processed',
+            'vehicle_name' => $booking->vehicle->name ?? 'Vehicle',
+            'booking_id' => $booking->id,
+            'late_fee' => $lateFee,
+            'damage_fee' => $validated['damage_fee'] ?? 0,
+            'cleaning_fee' => $validated['cleaning_fee'] ?? 0,
+            'total_additional_fees' => $lateFee + ($validated['damage_fee'] ?? 0) + ($validated['cleaning_fee'] ?? 0)
+        ];
+
+        // Add deposit refund information to notification
+        if (isset($validated['deposit_status'])) {
+            $notificationData['deposit_status'] = $validated['deposit_status'];
+            $notificationData['deposit_refund_amount'] = $depositData['deposit_refund_amount'];
+            $notificationData['refund_method'] = $validated['refund_method'];
+        }
+
+        app(\App\Services\NotificationService::class)->notifyUser(
+            $booking->user_id,
+            'vehicle_return_completed',
+            $booking,
+            $notificationData
+        );
+
+        return response()->json(['message' => 'Vehicle return processed', 'return' => $return]);
+    }
+
+    /**
+     * Process deposit refund separately from vehicle return
+     */
+    public function processDepositRefund(Request $request, Booking $booking)
+    {
+        $validated = $request->validate([
+            'deposit_status' => 'required|in:refunded,withheld',
+            'deposit_refund_amount' => 'nullable|numeric|min:0',
+            'deposit_refund_notes' => 'nullable|string',
+            'deposit_refund_proof' => 'nullable|array',
+            'deposit_refund_proof.*' => 'nullable|string',
+            'refund_method' => 'nullable|string',
+        ]);
+
+        $vehicleReturn = $booking->vehicleReturn;
+        if (!$vehicleReturn) {
+            return response()->json(['message' => 'Vehicle return not found'], 404);
+        }
+
+        if ($vehicleReturn->deposit_status === 'refunded') {
+            return response()->json(['message' => 'Deposit already refunded'], 422);
+        }
+
+        // Calculate default refund amount if not provided
+        $depositAmount = $booking->vehicle->deposit ?? 0;
+        $totalFees = ($vehicleReturn->late_fee ?? 0) + ($vehicleReturn->damage_fee ?? 0) + ($vehicleReturn->cleaning_fee ?? 0);
+        $defaultRefundAmount = max(0, $depositAmount - $totalFees);
+
+        $updateData = [
+            'deposit_status' => $validated['deposit_status'],
+            'deposit_refund_notes' => $validated['deposit_refund_notes'],
+        ];
+
+        if ($validated['deposit_status'] === 'refunded') {
+            $updateData['deposit_refund_amount'] = $validated['deposit_refund_amount'] ?? $defaultRefundAmount;
+            $updateData['deposit_refund_proof'] = $validated['deposit_refund_proof'];
+            $updateData['refund_method'] = $validated['refund_method'];
+            $updateData['deposit_refunded_at'] = now();
+        }
+
+        $vehicleReturn->update($updateData);
+
+        // Notify customer about deposit refund
+        app(\App\Services\NotificationService::class)->notifyUser(
+            $booking->user_id,
+            'deposit_refund_processed',
+            $booking,
+            [
+                'message' => $validated['deposit_status'] === 'refunded' 
+                    ? 'Your security deposit has been refunded' 
+                    : 'Your security deposit has been withheld',
+                'deposit_status' => $validated['deposit_status'],
+                'deposit_refund_amount' => $updateData['deposit_refund_amount'] ?? 0,
+                'refund_method' => $validated['refund_method'] ?? null,
+                'booking_id' => $booking->id,
+                'vehicle_name' => $booking->vehicle->name ?? 'Vehicle',
+            ]
+        );
+
+        return response()->json([
+            'message' => 'Deposit refund processed successfully', 
+            'vehicle_return' => $vehicleReturn->fresh()
+        ]);
     }
 
     /**
@@ -375,6 +507,64 @@ class BookingController extends Controller
             'message' => 'Booking cancelled',
             'refund_rate' => $refund,
             'refund_amount' => $refundAmount,
+        ]);
+    }
+
+    /**
+     * Process refund for a cancelled booking
+     */
+    public function processRefund(Request $request, $bookingId)
+    {
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:0.01',
+            'notes' => 'nullable|string|max:1000',
+            'refund_proof' => 'required|string', // base64 encoded image
+        ]);
+
+        $booking = Booking::findOrFail($bookingId);
+
+        // Only allow refund processing for cancelled bookings with pending refunds
+        if ($booking->status !== 'cancelled') {
+            return response()->json(['message' => 'Booking is not cancelled'], 422);
+        }
+
+        if ($booking->refund_status !== 'pending') {
+            return response()->json(['message' => 'Refund not available for processing'], 422);
+        }
+
+        // Check if there are approved payments for this booking
+        $approvedPayments = $booking->payments()->where('status', 'approved')->get();
+        if ($approvedPayments->isEmpty()) {
+            return response()->json(['message' => 'No approved payments found for this booking. Refund cannot be processed.'], 422);
+        }
+
+        // Update refund status with admin-specified amount
+        $booking->refund_status = 'processed';
+        $booking->refund_amount = $validated['amount'];
+        $booking->refund_processed_at = now();
+        $booking->refund_notes = $validated['notes'] ?? null;
+        $booking->refund_proof = $validated['refund_proof']; // Store base64 directly
+        $booking->save();
+
+        // Notify customer about refund completion
+        app(\App\Services\NotificationService::class)->notifyUser(
+            $booking->user_id,
+            'refund_processed',
+            $booking,
+            [
+                'message' => 'Your booking refund has been processed',
+                'vehicle_name' => $booking->vehicle->name ?? 'Vehicle',
+                'booking_id' => $booking->id,
+                'refund_amount' => $booking->refund_amount,
+                'refund_notes' => $booking->refund_notes,
+                'processed_at' => now(),
+                'approved_payments_count' => $approvedPayments->count(),
+            ]
+        );
+
+        return response()->json([
+            'message' => 'Refund processed successfully',
+            'booking' => $booking->fresh(),
         ]);
     }
 }

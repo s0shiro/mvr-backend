@@ -77,6 +77,79 @@ class BookingController extends Controller
     }
 
     /**
+     * Customer submits vehicle return details and images
+     */
+    public function submitReturn(Request $request, $bookingId)
+    {
+        $validated = $request->validate([
+            'customer_images' => 'required|array|min:1',
+            'customer_images.*' => 'string', // base64 encoded images
+            'customer_condition_notes' => 'nullable|string|max:1000',
+            'odometer' => 'nullable|integer|min:0',
+            'fuel_level' => 'nullable|string|max:50',
+            // Customer refund account information
+            'customer_refund_method' => 'required|string|in:gcash,bank_transfer,cash',
+            'customer_account_number' => 'nullable|string|max:50',
+            'customer_account_name' => 'nullable|string|max:100',
+            'customer_bank_name' => 'nullable|string|max:100',
+            'customer_refund_notes' => 'nullable|string|max:500',
+        ]);
+
+        $userId = Auth::id();
+        $booking = Booking::findOrFail($bookingId);
+
+        if ($booking->user_id !== $userId) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        // Only allow return submission if booking is released and not already returned
+        if ($booking->status !== 'released') {
+            return response()->json(['message' => 'Booking not eligible for return submission'], 422);
+        }
+
+        // Check if return already exists
+        if ($booking->vehicleReturn) {
+            return response()->json(['message' => 'Return already submitted'], 422);
+        }
+
+        // Create the return record with customer data
+        $return = $booking->vehicleReturn()->create([
+            'vehicle_id' => $booking->vehicle_id,
+            'customer_images' => $validated['customer_images'],
+            'customer_condition_notes' => $validated['customer_condition_notes'] ?? null,
+            'odometer' => $validated['odometer'] ?? null,
+            'fuel_level' => $validated['fuel_level'] ?? null,
+            'status' => 'customer_submitted',
+            'customer_submitted_at' => now(),
+            'returned_at' => now(), // Initial return timestamp
+            // Customer refund account information
+            'customer_refund_method' => $validated['customer_refund_method'],
+            'customer_account_number' => $validated['customer_account_number'] ?? null,
+            'customer_account_name' => $validated['customer_account_name'] ?? null,
+            'customer_bank_name' => $validated['customer_bank_name'] ?? null,
+            'customer_refund_notes' => $validated['customer_refund_notes'] ?? null,
+        ]);
+
+        // Update booking status to indicate return is pending admin review
+        $booking->status = 'pending_return';
+        $booking->save();
+
+        // Notify admins about the return submission
+        $this->notificationService->notifyAdmins('vehicle_return_submitted', $booking, [
+            'message' => 'Customer submitted vehicle return',
+            'customer_name' => Auth::user()->name,
+            'vehicle_name' => $booking->vehicle->name ?? 'Vehicle',
+            'booking_id' => $booking->id,
+            'customer_images_count' => count($validated['customer_images'])
+        ]);
+
+        return response()->json([
+            'message' => 'Return submitted successfully. Admin will review and process your return.',
+            'return' => $return
+        ]);
+    }
+
+    /**
      * Get booking summary (price, availability)
      */
     public function summary(Request $request)
@@ -193,6 +266,16 @@ class BookingController extends Controller
      */
     public function cancel(Request $request, $bookingId)
     {
+        $validated = $request->validate([
+            'cancellation_reason' => 'required|string|max:500',
+            // Refund account information (optional, only if has approved payments)
+            'refund_method' => 'nullable|string|in:gcash,bank_transfer,cash',
+            'account_number' => 'nullable|string|max:100',
+            'account_name' => 'nullable|string|max:100',
+            'bank_name' => 'nullable|string|max:100',
+            'refund_notes' => 'nullable|string|max:500',
+        ]);
+
         $userId = Auth::id();
         $booking = Booking::findOrFail($bookingId);
         if ($booking->user_id !== $userId) {
@@ -202,26 +285,77 @@ class BookingController extends Controller
         if (in_array($booking->status, ['cancelled', 'completed'])) {
             return response()->json(['message' => 'Booking cannot be cancelled'], 422);
         }
-        // Refund logic: full if >7 days before, 50% if <7 days, none if <24h
-        $hours = now()->diffInHours($booking->start_date, false);
+
+        // Check if there are any approved payments for this booking
+        $approvedPayments = $booking->payments()->where('status', 'approved')->get();
+        $hasApprovedPayments = $approvedPayments->isNotEmpty();
+
+        // Only calculate refund if there are approved payments
         $refund = 0;
-        if ($hours >= 168) { // 7 days
-            $refund = 1.0;
-        } elseif ($hours >= 24) {
-            $refund = 0.5;
+        $refundAmount = 0;
+        
+        if ($hasApprovedPayments) {
+            // Refund logic: full if >7 days before, 50% if <7 days, none if <24h
+            $hours = now()->diffInHours($booking->start_date, false);
+            
+            if ($hours >= 168) { // 7 days
+                $refund = 1.0;
+            } elseif ($hours >= 24) {
+                $refund = 0.5;
+            }
+            
+            // Calculate refund based on approved payments only
+            $totalApprovedAmount = $approvedPayments->sum(function($payment) {
+                // For simplicity, we'll use the vehicle deposit as the payment amount
+                // In a real system, you might store the payment amount in the payments table
+                $vehicle = $payment->booking->vehicle;
+                return $vehicle ? $vehicle->deposit : 0;
+            });
+            
+            $refundAmount = $totalApprovedAmount * $refund;
         }
-        // Refund is based on the vehicle's deposit, not total_price
-        $vehicle = $booking->vehicle;
-        $deposit = $vehicle ? $vehicle->deposit : 0;
-        $refundAmount = $deposit * $refund;
+        
         $booking->status = 'cancelled';
         $booking->refund_rate = $refund;
         $booking->refund_amount = $refundAmount;
+        $booking->refund_status = $refundAmount > 0 ? 'pending' : 'not_applicable';
+        $booking->cancelled_at = now();
+        $booking->cancellation_reason = $validated['cancellation_reason'];
+        
+        // Store customer refund account information if provided
+        if ($hasApprovedPayments && isset($validated['refund_method'])) {
+            $booking->refund_method = $validated['refund_method'];
+            $booking->refund_account_number = $validated['account_number'] ?? null;
+            $booking->refund_account_name = $validated['account_name'] ?? null;
+            $booking->refund_bank_name = $validated['bank_name'] ?? null;
+            $booking->refund_customer_notes = $validated['refund_notes'] ?? null;
+        }
+        
         $booking->save();
-        return response()->json([
-            'message' => 'Booking cancelled',
+
+        // Notify admins about the customer cancellation
+        $this->notificationService->notifyAdmins('booking_cancelled_by_customer', $booking, [
+            'message' => 'Customer cancelled a booking',
+            'customer_name' => Auth::user()->name,
+            'vehicle_name' => $booking->vehicle->name ?? 'Vehicle',
+            'booking_id' => $booking->id,
+            'start_date' => $booking->start_date,
+            'end_date' => $booking->end_date,
+            'total_price' => $booking->total_price,
             'refund_rate' => $refund,
             'refund_amount' => $refundAmount,
+            'cancellation_reason' => $validated['cancellation_reason'],
+            'cancelled_at' => now(),
+            'has_approved_payments' => $hasApprovedPayments,
+        ]);
+
+        return response()->json([
+            'message' => 'Booking cancelled successfully',
+            'refund_rate' => $refund,
+            'refund_amount' => $refundAmount,
+            'refund_note' => $refundAmount > 0 
+                ? 'Your deposit refund will be processed by an admin within 1-3 business days.' 
+                : 'No refund is applicable for this cancellation timing.',
         ]);
     }
 

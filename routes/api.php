@@ -64,6 +64,7 @@ Route::controller(BookingController::class)->middleware(['auth:api', 'role:admin
     Route::post('/bookings', 'store'); // Create booking
     Route::put('/bookings/{booking}', 'update'); // Modify booking (FR006)
     Route::post('/bookings/{booking}/cancel', 'cancel'); // Cancel booking (FR007)
+    Route::post('/bookings/{booking}/submit-return', 'submitReturn'); // Customer submits return
     Route::get('/mybookings', 'myBookings'); // List bookings for the authenticated user
     Route::get('/mybookings/completed', 'myCompletedBookings'); // List completed bookings for the authenticated user
     Route::get('/bookings/{booking}/summary-details', 'summaryDetails'); // Get detailed booking summary
@@ -96,10 +97,12 @@ Route::middleware(['auth:api', 'role:admin|manager'])->prefix('admin')->group(fu
     Route::post('/bookings/payments/{paymentId}/confirm', [App\Http\Controllers\Admin\BookingController::class, 'confirmPayment']);
     Route::post('/bookings/payments/{paymentId}/reject', [App\Http\Controllers\Admin\BookingController::class, 'rejectPayment']);
     Route::post('/bookings/{booking}/cancel', [App\Http\Controllers\Admin\BookingController::class, 'cancel']); // Admin cancel booking
+    Route::post('/bookings/{booking}/process-refund', [App\Http\Controllers\Admin\BookingController::class, 'processRefund']); // Process customer refund
     Route::post('/bookings/{booking}/release', [App\Http\Controllers\Admin\BookingController::class, 'releaseVehicle']); // Confirm vehicle release
     Route::get('/bookings/for-release', [App\Http\Controllers\Admin\BookingController::class, 'forRelease']);
     Route::get('/bookings/for-return', [App\Http\Controllers\Admin\BookingController::class, 'forReturn']);
     Route::post('/bookings/{booking}/return', [App\Http\Controllers\Admin\BookingController::class, 'returnVehicle']);
+    Route::post('/bookings/{booking}/refund-deposit', [App\Http\Controllers\Admin\BookingController::class, 'processDepositRefund']);
     Route::get('/bookings/completed', [App\Http\Controllers\Admin\BookingController::class, 'completed']); // Completed bookings history
     Route::get('/bookings/canceled', [App\Http\Controllers\Admin\BookingController::class, 'canceled']); // Canceled bookings history
     Route::get('/bookings/{booking}', [App\Http\Controllers\Admin\BookingController::class, 'show']); // Get a specific booking by ID
@@ -136,7 +139,7 @@ Route::middleware(['auth:api', 'role:admin'])->group(function () {
 });
 
 // Rental payment routes (admin only)
-Route::middleware(['auth:api', 'role:admin'])->prefix('rental')->group(function () {
+Route::middleware(['auth:api', 'role:admin|manager'])->prefix('rental')->group(function () {
     Route::get('/payments', [RentalPaymentController::class, 'index']);
     Route::get('/revenue', [RentalPaymentController::class, 'revenue']);
     Route::get('/payments/summary', [RentalPaymentController::class, 'summary']);
