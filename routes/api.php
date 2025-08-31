@@ -36,7 +36,7 @@ Route::controller(VehicleController::class)->group(function () {
     });
 
     // Routes accessible to admin only
-    Route::middleware(['auth:api', 'role:admin'])->group(function () {
+    Route::middleware(['auth:api', 'role:admin|manager'])->group(function () {
         Route::post('/vehicles', 'store');
         Route::put('/vehicles/{vehicle}', 'update');
         Route::delete('/vehicles/{vehicle}', 'destroy');
