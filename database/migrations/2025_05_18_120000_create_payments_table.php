@@ -11,8 +11,8 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('booking_id')->constrained()->onDelete('cascade');
             $table->string('method'); // e.g. gcash, bank_transfer, or any admin-defined key
-            $table->string('reference_number');
-            $table->longText('proof_image'); // base64
+            $table->string('reference_number')->nullable();  // Make nullable
+            $table->longText('proof_image')->nullable();  // Make nullable
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->enum('type', ['deposit', 'rental'])->default('deposit');
             $table->timestamp('approved_at')->nullable();

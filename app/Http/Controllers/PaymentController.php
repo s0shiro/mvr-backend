@@ -27,7 +27,8 @@ class PaymentController extends Controller
     // Customer submits payment info
     public function store(Request $request, $bookingId)
     {
-        $validated = $request->validate([
+        $method = $request->input('method');
+        $rules = [
             'method' => [
                 'required',
                 'string',
@@ -39,13 +40,14 @@ class PaymentController extends Controller
                 },
             ],
             'reference_number' => [
-                'required',
+                $method === 'cash' ? 'nullable' : 'required',
                 'string',
                 'unique:payments,reference_number',
             ],
-            'proof_image' => 'required|string', // base64
+            'proof_image' => $method === 'cash' ? 'nullable|string' : 'required|string',
             'type' => 'in:deposit,rental', // optional, default to deposit
-        ]);
+        ];
+        $validated = $request->validate($rules);
         $userId = Auth::id();
         $booking = Booking::findOrFail($bookingId);
         if ($booking->user_id !== $userId) {

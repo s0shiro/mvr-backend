@@ -12,8 +12,8 @@ return new class extends Migration
             $table->id();
             $table->string('key')->unique(); // e.g. gcash, bank_transfer
             $table->string('label');
-            $table->string('account_name');
-            $table->string('account_number');
+            $table->string('account_name')->nullable();  // Make nullable
+            $table->string('account_number')->nullable();  // Make nullable
             $table->string('bank_name')->nullable();
             $table->timestamps();
         });
