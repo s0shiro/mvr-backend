@@ -322,13 +322,13 @@ class BookingController extends Controller
         $booking->cancelled_at = now();
         $booking->cancellation_reason = $validated['cancellation_reason'];
         
-        // Store customer refund account information if provided
-        if ($hasApprovedPayments && isset($validated['refund_method'])) {
+        // Store customer refund account information if provided and has approved payments
+        if ($hasApprovedPayments && !empty($validated['refund_method'])) {
             $booking->refund_method = $validated['refund_method'];
-            $booking->refund_account_number = $validated['account_number'] ?? null;
-            $booking->refund_account_name = $validated['account_name'] ?? null;
-            $booking->refund_bank_name = $validated['bank_name'] ?? null;
-            $booking->refund_customer_notes = $validated['refund_notes'] ?? null;
+            $booking->refund_account_number = $validated['account_number'];
+            $booking->refund_account_name = $validated['account_name'];
+            $booking->refund_bank_name = $validated['bank_name'];
+            $booking->refund_customer_notes = $validated['refund_notes'];
         }
         
         $booking->save();

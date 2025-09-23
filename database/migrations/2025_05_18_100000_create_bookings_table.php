@@ -13,7 +13,7 @@ return new class extends Migration {
             $table->foreignId('vehicle_id')->constrained()->onDelete('cascade');
             $table->timestampTz('start_date');
             $table->timestampTz('end_date');
-            $table->enum('status', ['pending', 'confirmed', 'for_release', 'released', 'cancelled', 'completed'])->default('pending');
+            $table->enum('status', ['pending', 'confirmed', 'for_release', 'released', 'canceled', 'cancelled', 'completed'])->default('pending');
             $table->decimal('total_price', 10, 2)->nullable();
             $table->text('notes')->nullable();
             $table->boolean('driver_requested')->default(false); 

@@ -14,7 +14,7 @@ return new class extends Migration
     {
         // Drop the existing status check constraint and recreate it with pending_return included
         DB::statement('ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_status_check');
-        DB::statement("ALTER TABLE bookings ADD CONSTRAINT bookings_status_check CHECK (status IN ('pending', 'confirmed', 'for_release', 'released', 'cancelled', 'completed', 'pending_return'))");
+        DB::statement("ALTER TABLE bookings ADD CONSTRAINT bookings_status_check CHECK (status IN ('pending', 'confirmed', 'for_release', 'released', 'cancelled', 'canceled', 'completed', 'pending_return'))");
     }
 
     /**
@@ -24,6 +24,6 @@ return new class extends Migration
     {
         // Restore the original constraint without pending_return
         DB::statement('ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_status_check');
-        DB::statement("ALTER TABLE bookings ADD CONSTRAINT bookings_status_check CHECK (status IN ('pending', 'confirmed', 'for_release', 'released', 'cancelled', 'completed'))");
+        DB::statement("ALTER TABLE bookings ADD CONSTRAINT bookings_status_check CHECK (status IN ('pending', 'confirmed', 'for_release', 'released', 'cancelled', 'canceled', 'completed'))");
     }
 };
