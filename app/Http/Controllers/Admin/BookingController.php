@@ -51,6 +51,9 @@ class BookingController extends Controller
                 'vehicle' => $booking->vehicle ? [
                     'id' => $booking->vehicle->id,
                     'name' => $booking->vehicle->name,
+                    'model' => $booking->vehicle->model,
+                    'brand' => $booking->vehicle->brand,
+                    'year' => $booking->vehicle->year, 
                     'primary_image_url' => $booking->vehicle->primary_image_url ?? null,
                 ] : null,
             ];
@@ -90,11 +93,19 @@ class BookingController extends Controller
     /**
      * List completed bookings (status = 'completed') for admin history
      */
-    public function completed()
+    public function completed(Request $request)
     {
+        $validated = $request->validate([
+            'sort_by' => 'nullable|in:created_at,updated_at,start_date,end_date,total_price',
+            'sort_order' => 'nullable|in:asc,desc'
+        ]);
+
+        $sortBy = $validated['sort_by'] ?? 'created_at';
+        $sortOrder = $validated['sort_order'] ?? 'desc';
+
         $bookings = Booking::with(['user', 'vehicle', 'payments', 'vehicleRelease', 'vehicleReturn'])
             ->where('status', 'completed')
-            ->orderBy('created_at', 'desc')
+            ->orderBy($sortBy, $sortOrder)
             ->get();
 
         return response()->json(['bookings' => $bookings]);
@@ -103,11 +114,22 @@ class BookingController extends Controller
     /**
      * List canceled bookings (status = 'cancelled') for admin history
      */
-    public function canceled()
+    public function canceled(Request $request)
     {
+        $validated = $request->validate([
+            'sort_by' => 'nullable|in:created_at,cancelled_at,start_date,end_date,total_price',
+            'sort_order' => 'nullable|in:asc,desc'
+        ]);
+
+        $sortBy = $validated['sort_by'] ?? 'created_at';
+        $sortOrder = $validated['sort_order'] ?? 'desc';
+
+        // Handle cancelled_at sorting by using updated_at as fallback
+        $orderColumn = $sortBy === 'cancelled_at' ? 'updated_at' : $sortBy;
+
         $bookings = Booking::with(['user', 'vehicle', 'payments'])
             ->where('status', 'cancelled')
-            ->orderBy('created_at', 'desc')
+            ->orderBy($orderColumn, $sortOrder)
             ->get();
 
         return response()->json(['bookings' => $bookings]);

@@ -365,16 +365,46 @@ class BookingController extends Controller
     public function myBookings(Request $request)
     {
         $userId = Auth::id();
-        $bookings = Booking::where('user_id', $userId)
+        
+        // Get sorting parameters with defaults
+        $sortBy = $request->query('sort_by', 'created_at');
+        $sortOrder = $request->query('sort_order', 'desc');
+        
+        // Get status filter
+        $statusFilter = $request->query('status');
+        
+        // Validate sort_by parameter to prevent SQL injection
+        $allowedSortFields = ['created_at', 'start_date', 'end_date', 'total_price', 'status'];
+        if (!in_array($sortBy, $allowedSortFields)) {
+            $sortBy = 'created_at';
+        }
+        
+        // Validate sort_order parameter
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+        
+        // Validate status filter
+        $allowedStatuses = ['pending', 'confirmed', 'for_release', 'released', 'cancelled'];
+        if ($statusFilter && !in_array($statusFilter, $allowedStatuses)) {
+            $statusFilter = null;
+        }
+        
+        $query = Booking::where('user_id', $userId)
             ->where('status', '!=', 'completed')
             ->with([
                 'vehicle',
                 'payments',
                 'latestDepositPayment',
                 'latestRentalPayment'
-            ])
-            ->orderByDesc('created_at')
-            ->get();
+            ]);
+        
+        // Apply status filter if provided
+        if ($statusFilter) {
+            $query->where('status', $statusFilter);
+        }
+        
+        $bookings = $query->orderBy($sortBy, $sortOrder)->get();
         return response()->json(['bookings' => $bookings]);
     }
 
