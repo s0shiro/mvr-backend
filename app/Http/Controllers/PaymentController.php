@@ -111,4 +111,25 @@ class PaymentController extends Controller
         }
         return response()->json(['message' => ucfirst($type).' payment status updated', 'payment' => $payment]);
     }
+
+    // Get blocked dates for a vehicle (dates with approved deposit payments)
+    public function getBlockedDates($vehicleId)
+    {
+        $blockedDates = Payment::where('type', 'deposit')
+            ->where('status', 'approved')
+            ->whereHas('booking', function ($query) use ($vehicleId) {
+                $query->where('vehicle_id', $vehicleId)
+                      ->whereNotIn('status', ['cancelled', 'completed']);
+            })
+            ->with('booking:id,start_date,end_date')
+            ->get()
+            ->map(function ($payment) {
+                return [
+                    'start_date' => $payment->booking->start_date,
+                    'end_date' => $payment->booking->end_date,
+                ];
+            });
+
+        return response()->json($blockedDates);
+    }
 }

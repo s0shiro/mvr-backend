@@ -16,7 +16,7 @@ class BookingService
     public function isAvailable($vehicleId, $startDate, $endDate, $excludeBookingId = null)
     {
         $query = Booking::where('vehicle_id', $vehicleId)
-            ->where('status', '!=', 'cancelled');
+            ->whereNotIn('status', ['cancelled', 'completed']);
         if ($excludeBookingId) {
             $query->where('id', '!=', $excludeBookingId);
         }
@@ -44,7 +44,7 @@ class BookingService
         $drivers = \App\Models\Driver::where('status', 'active')->get();
         foreach ($drivers as $driver) {
             $hasConflict = Booking::where('driver_id', $driver->id)
-                ->where('status', '!=', 'cancelled')
+                ->whereNotIn('status', ['cancelled', 'completed'])
                 ->where(function ($query) use ($startDate, $endDate) {
                     $query->whereBetween('start_date', [$startDate, $endDate])
                         ->orWhereBetween('end_date', [$startDate, $endDate])
@@ -66,9 +66,10 @@ class BookingService
      */
     public function createBooking($userId, $vehicleId, $startDate, $endDate, $notes = null, $driverRequested = false, $pickupType = 'pickup', $deliveryLocation = null, $deliveryDetails = null, $validIds = null)
     {
-        if (!$this->isAvailable($vehicleId, $startDate, $endDate)) {
-            return null; // Not available, conflict exists
-        }
+        // Temporarily commented out availability check
+        // if (!$this->isAvailable($vehicleId, $startDate, $endDate)) {
+        //     return null; // Not available, conflict exists
+        // }
         $vehicle = Vehicle::findOrFail($vehicleId);
         // Calculate delivery fee if applicable
         $deliveryFee = 0;

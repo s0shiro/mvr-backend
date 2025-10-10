@@ -77,6 +77,7 @@ Route::controller(PaymentController::class)->middleware(['auth:api', 'role:admin
     Route::post('/bookings/{booking}/payment', 'store'); // Customer submits payment
     Route::get('/bookings/{booking}/payment', 'show'); // View payment info
     Route::patch('/bookings/{booking}/payment/status', 'updateStatus'); // Admin updates payment status
+    Route::get('/vehicles/{vehicle}/blocked-dates', 'getBlockedDates'); // Get blocked dates for vehicle
 });
 
 // Feedback routes
