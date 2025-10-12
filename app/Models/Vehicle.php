@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\Booking;
+use App\Models\VehicleImage;
+use App\Models\VehicleMaintenance;
 
 class Vehicle extends Model
 {
@@ -65,6 +67,11 @@ class Vehicle extends Model
     public function primaryImage()
     {
         return $this->hasOne(VehicleImage::class)->where('is_primary', true);
+    }
+
+    public function maintenances()
+    {
+        return $this->hasMany(VehicleMaintenance::class)->orderByDesc('maintenance_date')->orderByDesc('id');
     }
 
     /**

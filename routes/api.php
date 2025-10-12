@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\VehicleMaintenanceController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\FeedbackController;
@@ -38,6 +39,13 @@ Route::controller(VehicleController::class)->group(function () {
     // Routes accessible to admin only
     Route::middleware(['auth:api', 'role:admin|manager'])->group(function () {
         Route::post('/vehicles', 'store');
+
+Route::controller(VehicleMaintenanceController::class)
+    ->middleware(['auth:api', 'role:admin|manager'])
+    ->group(function () {
+        Route::get('/vehicles/{vehicle}/maintenance', 'index');
+        Route::post('/vehicles/{vehicle}/maintenance', 'store');
+    });
         Route::put('/vehicles/{vehicle}', 'update');
         Route::delete('/vehicles/{vehicle}', 'destroy');
         Route::patch('/vehicles/{vehicle}/status', 'updateStatus');
@@ -123,7 +131,7 @@ Route::middleware(['auth:api', 'role:admin|manager'])->prefix('admin')->group(fu
 });
 
 // Business routes (admin only)
-Route::middleware(['auth:api', 'role:admin'])->group(function () {
+Route::middleware(['auth:api', 'role:admin|manager'])->group(function () {
     Route::get('/businesses', [App\Http\Controllers\BusinessController::class, 'index']);
     Route::post('/businesses', [App\Http\Controllers\BusinessController::class, 'store']);
     Route::get('/businesses/{id}', [App\Http\Controllers\BusinessController::class, 'show']);

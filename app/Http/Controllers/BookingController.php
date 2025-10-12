@@ -7,6 +7,7 @@ use App\Services\BookingService;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Booking;
+use App\Models\Vehicle;
 use NumberToWords\NumberToWords;
 
 class BookingController extends Controller
@@ -159,13 +160,28 @@ class BookingController extends Controller
             'start_date' => 'required|date|after:now',
             'end_date' => 'required|date|after:start_date',
             'driver_requested' => 'boolean',
+            'booking_id' => 'nullable|integer|exists:bookings,id',
         ]);
+
+        $bookingId = $validated['booking_id'] ?? null;
+        $bookingToExclude = null;
+
+        if ($bookingId) {
+            $bookingToExclude = Booking::findOrFail($bookingId);
+
+            if ($bookingToExclude->user_id !== Auth::id()) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+        }
         $hasConflict = !$this->bookingService->isAvailable(
             $validated['vehicle_id'],
             $validated['start_date'],
-            $validated['end_date']
+            $validated['end_date'],
+            $bookingId
         );
-        $vehicle = \App\Models\Vehicle::findOrFail($validated['vehicle_id']);
+        $vehicle = $bookingToExclude && (int) $bookingToExclude->vehicle_id === (int) $validated['vehicle_id']
+            ? $bookingToExclude->vehicle
+            : Vehicle::findOrFail($validated['vehicle_id']);
         $driverRequested = $validated['driver_requested'] ?? false;
         $price = $this->bookingService->calculatePrice(
             $vehicle, 
@@ -237,7 +253,7 @@ class BookingController extends Controller
         $deliveryLocation = $validated['delivery_location'] ?? $booking->delivery_location;
         $deliveryDetails = $validated['delivery_details'] ?? $booking->delivery_details;
         $service = app(BookingService::class);
-        if ($service->isAvailable($vehicleId, $startDate, $endDate, $booking->id)) {
+        if (!$service->isAvailable($vehicleId, $startDate, $endDate, $booking->id)) {
             return response()->json(['message' => 'Vehicle not available for selected dates'], 409);
         }
         // Calculate delivery fee
@@ -247,6 +263,10 @@ class BookingController extends Controller
         $end = \Carbon\Carbon::parse($endDate);
         $hours = $start->floatDiffInHours($end);
         $days = max(1, (int) ceil($hours / 24));
+        $vehicleModel = (int) $booking->vehicle_id === (int) $vehicleId
+            ? $booking->vehicle
+            : Vehicle::findOrFail($vehicleId);
+        $driverRequested = $booking->driver_requested;
         $booking->update(array_merge($validated, [
             'vehicle_id' => $vehicleId,
             'start_date' => $startDate,
@@ -255,7 +275,7 @@ class BookingController extends Controller
             'delivery_location' => $deliveryLocation,
             'delivery_details' => $deliveryDetails,
             'delivery_fee' => $deliveryFee,
-            'total_price' => $service->calculatePrice($booking->vehicle, $startDate, $endDate) + $deliveryFee,
+            'total_price' => $service->calculatePrice($vehicleModel, $startDate, $endDate, $driverRequested) + $deliveryFee,
             'days' => $days,
         ]));
         return response()->json(['message' => 'Booking updated', 'booking' => $booking]);
