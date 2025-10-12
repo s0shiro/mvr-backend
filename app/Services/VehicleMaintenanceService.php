@@ -10,7 +10,26 @@ class VehicleMaintenanceService
 {
     public function listMaintenance(Vehicle $vehicle, array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
-    $query = $vehicle->maintenances();
+        $query = $this->buildMaintenanceQuery($vehicle, $filters);
+
+        return $query->paginate($perPage);
+    }
+
+    public function createMaintenance(Vehicle $vehicle, array $data): VehicleMaintenance
+    {
+        return $vehicle->maintenances()->create($data);
+    }
+
+    public function calculateTotalMaintenanceCost(Vehicle $vehicle, array $filters = []): float
+    {
+        $query = $this->buildMaintenanceQuery($vehicle, $filters);
+
+        return (float) $query->sum('amount');
+    }
+
+    private function buildMaintenanceQuery(Vehicle $vehicle, array $filters = [])
+    {
+        $query = $vehicle->maintenances();
 
         if (!empty($filters['search'])) {
             $search = strtolower($filters['search']);
@@ -28,11 +47,6 @@ class VehicleMaintenanceService
             $query->whereDate('maintenance_date', '<=', $filters['date_to']);
         }
 
-        return $query->paginate($perPage);
-    }
-
-    public function createMaintenance(Vehicle $vehicle, array $data): VehicleMaintenance
-    {
-        return $vehicle->maintenances()->create($data);
+        return $query;
     }
 }

@@ -31,6 +31,7 @@ class VehicleMaintenanceController extends Controller
         );
 
         $history = $this->vehicleMaintenanceService->listMaintenance($vehicle, $filters, $perPage);
+        $totalAmount = $this->vehicleMaintenanceService->calculateTotalMaintenanceCost($vehicle, $filters);
 
         return response()->json([
             'status' => 'success',
@@ -40,6 +41,9 @@ class VehicleMaintenanceController extends Controller
                 'per_page' => $history->perPage(),
                 'total' => $history->total(),
                 'last_page' => $history->lastPage(),
+            ],
+            'summary' => [
+                'total_amount' => round($totalAmount, 2),
             ],
         ]);
     }

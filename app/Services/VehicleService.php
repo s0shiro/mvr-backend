@@ -18,7 +18,8 @@ class VehicleService
      */
     public function getPaginatedVehicles(array $filters = [], int $cursor = 0, int $limit = 10): array
     {
-        $query = Vehicle::query();
+        $query = Vehicle::query()
+            ->withSum('maintenances as maintenance_total', 'amount');
 
         // Apply filters
         if (isset($filters['type']) && !empty($filters['type'])) {
@@ -92,7 +93,8 @@ class VehicleService
      */
     public function getVehicleById(int $id): ?Vehicle
     {
-        return Vehicle::findOrFail($id);
+        return Vehicle::withSum('maintenances as maintenance_total', 'amount')
+            ->findOrFail($id);
     }
 
     /**
