@@ -29,6 +29,13 @@ class Vehicle extends Model
         'rental_rate',
         'rental_rate_with_driver',
         'deposit',
+        'fee_per_kilometer',
+        'late_fee_per_hour',
+        'late_fee_per_day',
+        'gasoline_late_fee_per_liter',
+        'fuel_capacity',
+        'fuel_type',
+        'color',
         'description',
         'status',
     ];
@@ -43,6 +50,12 @@ class Vehicle extends Model
         'capacity' => 'integer',
         'rental_rate' => 'decimal:2',
         'deposit' => 'decimal:2',
+        'rental_rate_with_driver' => 'decimal:2',
+        'fee_per_kilometer' => 'decimal:2',
+        'late_fee_per_hour' => 'decimal:2',
+        'late_fee_per_day' => 'decimal:2',
+        'gasoline_late_fee_per_liter' => 'decimal:2',
+        'fuel_capacity' => 'integer',
     ];
 
     /**

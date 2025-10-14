@@ -54,16 +54,23 @@ class VehicleController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validatedData = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|min:1|max:255',
             'type' => 'required|string|in:car,motorcycle',
-            'brand' => 'required|string|max:100',
-            'model' => 'required|string|max:100',
+            'brand' => 'required|string|min:1|max:100',
+            'model' => 'required|string|min:1|max:100',
             'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
-            'plate_number' => 'required|string|unique:vehicles,plate_number|max:20',
+            'plate_number' => 'required|string|min:1|max:20|unique:vehicles,plate_number',
             'capacity' => 'required|integer|min:1',
             'rental_rate' => 'required|numeric|min:0',
             'rental_rate_with_driver' => 'required|numeric|min:0',
             'deposit' => 'required|numeric|min:0',
+            'fee_per_kilometer' => 'required|numeric|min:0',
+            'late_fee_per_hour' => 'required|numeric|min:0',
+            'late_fee_per_day' => 'required|numeric|min:0',
+            'gasoline_late_fee_per_liter' => 'required|numeric|min:0',
+            'fuel_capacity' => 'nullable|integer|min:0',
+            'fuel_type' => 'nullable|string|max:50',
+            'color' => 'nullable|string|max:50',
             'description' => 'nullable|string',
             'status' => 'required|string|in:available,maintenance,rented'
         ]);
@@ -108,18 +115,25 @@ class VehicleController extends Controller
     public function update(Request $request, Vehicle $vehicle): JsonResponse
     {
         $validatedData = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'type' => 'sometimes|string|in:car,motorcycle',
-            'brand' => 'sometimes|string|max:100',
-            'model' => 'sometimes|string|max:100',
-            'year' => 'sometimes|integer|min:1900|max:' . (date('Y') + 1),
-            'plate_number' => 'sometimes|string|unique:vehicles,plate_number,' . $vehicle->id . '|max:20',
-            'capacity' => 'sometimes|integer|min:1',
-            'rental_rate' => 'sometimes|numeric|min:0',
-            'rental_rate_with_driver' => 'sometimes|numeric|min:0',
-            'deposit' => 'sometimes|numeric|min:0',
+            'name' => 'required|string|min:1|max:255',
+            'type' => 'required|string|in:car,motorcycle',
+            'brand' => 'required|string|min:1|max:100',
+            'model' => 'required|string|min:1|max:100',
+            'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
+            'plate_number' => 'required|string|min:1|max:20|unique:vehicles,plate_number,' . $vehicle->id,
+            'capacity' => 'required|integer|min:1',
+            'rental_rate' => 'required|numeric|min:0',
+            'rental_rate_with_driver' => 'required|numeric|min:0',
+            'deposit' => 'required|numeric|min:0',
+            'fee_per_kilometer' => 'required|numeric|min:0',
+            'late_fee_per_hour' => 'required|numeric|min:0',
+            'late_fee_per_day' => 'required|numeric|min:0',
+            'gasoline_late_fee_per_liter' => 'required|numeric|min:0',
+            'fuel_capacity' => 'nullable|integer|min:0',
+            'fuel_type' => 'nullable|string|max:50',
+            'color' => 'nullable|string|max:50',
             'description' => 'nullable|string',
-            'status' => 'sometimes|string|in:available,maintenance,rented'
+            'status' => 'required|string|in:available,maintenance,rented'
         ]);
 
         $this->vehicleService->updateVehicle($vehicle, $validatedData);

@@ -23,6 +23,13 @@ return new class extends Migration
             $table->decimal('rental_rate', 10, 2); // per day without driver
             $table->decimal('rental_rate_with_driver', 10, 2); // per day with driver
             $table->decimal('deposit', 10, 2)->default(0); // deposit required for vehicle
+            $table->decimal('fee_per_kilometer', 10, 2)->default(0); // usage fee per kilometer
+            $table->decimal('late_fee_per_hour', 10, 2)->default(0); // late return penalty per hour
+            $table->decimal('late_fee_per_day', 10, 2)->default(0); // late return penalty per day
+            $table->decimal('gasoline_late_fee_per_liter', 10, 2)->default(0); // penalty for missing fuel
+            $table->integer('fuel_capacity')->nullable(); // tank capacity in liters
+            $table->string('fuel_type')->nullable(); // gasoline, diesel, etc.
+            $table->string('color')->nullable();
             $table->text('description')->nullable();
             $table->string('status')->default('available'); // available, maintenance, rented
             $table->timestamps();
