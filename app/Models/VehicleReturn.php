@@ -25,6 +25,7 @@ class VehicleReturn extends Model
         'late_fee',
         'damage_fee',
         'cleaning_fee',
+        'fuel_fee',
         'deposit_status',
         'deposit_refund_amount',
         'deposit_refund_notes',
@@ -43,7 +44,8 @@ class VehicleReturn extends Model
         'images' => 'array',
         'customer_images' => 'array',
         'deposit_refund_proof' => 'array',
-        'returned_at' => 'datetime',
+        'fuel_fee' => 'decimal:2',
+        'returned_at' => 'datetime', // Date and time the vehicle was returned
         'customer_submitted_at' => 'datetime',
         'admin_processed_at' => 'datetime',
         'deposit_refunded_at' => 'datetime',

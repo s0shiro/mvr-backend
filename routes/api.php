@@ -72,6 +72,7 @@ Route::controller(BookingController::class)->middleware(['auth:api', 'role:admin
     Route::post('/bookings', 'store'); // Create booking
     Route::put('/bookings/{booking}', 'update'); // Modify booking (FR006)
     Route::post('/bookings/{booking}/cancel', 'cancel'); // Cancel booking (FR007)
+    Route::post('/bookings/{booking}/refund-details', 'submitRefundDetails'); // Submit refund account information after cancellation
     Route::post('/bookings/{booking}/submit-return', 'submitReturn'); // Customer submits return
     Route::get('/mybookings', 'myBookings'); // List bookings for the authenticated user
     Route::get('/mybookings/completed', 'myCompletedBookings'); // List completed bookings for the authenticated user

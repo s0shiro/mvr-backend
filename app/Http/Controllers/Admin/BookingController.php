@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class BookingController extends Controller
@@ -87,6 +88,12 @@ class BookingController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        $bookings->each(function (Booking $booking) {
+            $lateFeeDetails = $this->calculateLateFeeDetails($booking);
+            $booking->setAttribute('calculated_late_fee', $lateFeeDetails['amount']);
+            $booking->setAttribute('late_fee_details', $lateFeeDetails);
+        });
+
         return response()->json(['bookings' => $bookings]);
     }
 
@@ -141,38 +148,66 @@ class BookingController extends Controller
     public function confirmPayment($paymentId)
     {
         $payment = Payment::findOrFail($paymentId);
+        $booking = $payment->booking;
         $payment->status = 'approved';
         $payment->approved_at = now();
         $payment->save();
 
         // If this was a deposit payment, update booking status to confirmed
         if ($payment->type === 'deposit') {
-            $payment->booking->status = 'confirmed';
-            $payment->booking->save();
+            if ($booking) {
+                $hasApprovedRental = $booking->payments()
+                    ->where('type', 'rental')
+                    ->where('status', 'approved')
+                    ->exists();
+
+                $booking->status = $hasApprovedRental ? 'for_release' : 'confirmed';
+                $booking->save();
+            }
         }
 
         // If this was a rental payment, update booking status to ready_for_release
         if ($payment->type === 'rental') {
-            $payment->booking->status = 'for_release';
-            $payment->booking->save();
+            if ($booking) {
+                $hasApprovedDeposit = $booking->payments()
+                    ->where('type', 'deposit')
+                    ->where('status', 'approved')
+                    ->exists();
+
+                $booking->status = $hasApprovedDeposit ? 'for_release' : 'confirmed';
+                $booking->save();
+            }
         }
 
-        // Notify user about approval
-        app(\App\Services\NotificationService::class)->notifyUser(
-            $payment->booking->user_id,
-            'payment_status_updated',
-            $payment,
-            [
-                'message' => 'Your ' . $payment->type . ' payment has been approved',
-                'customer_name' => $payment->booking->user->name,
-                'payment_type' => $payment->type,
-                'payment_status' => 'approved',
-                'payment_method' => $payment->method,
-                'booking_id' => $payment->booking->id
-            ]
-        );
+        $conflictSummary = ['count' => 0, 'ids' => []];
+        if ($booking) {
+            $booking->loadMissing('vehicle', 'user');
+            if (in_array($booking->status, ['confirmed', 'for_release'], true)) {
+                $conflictSummary = $this->cancelConflictingBookings($booking);
+            }
 
-        return response()->json(['message' => 'Payment confirmed', 'payment' => $payment]);
+            // Notify user about approval
+            app(\App\Services\NotificationService::class)->notifyUser(
+                $booking->user_id,
+                'payment_status_updated',
+                $payment,
+                [
+                    'message' => 'Your ' . $payment->type . ' payment has been approved',
+                    'customer_name' => $booking->user?->name,
+                    'payment_type' => $payment->type,
+                    'payment_status' => 'approved',
+                    'payment_method' => $payment->method,
+                    'booking_id' => $booking->id
+                ]
+            );
+        }
+
+        return response()->json([
+            'message' => 'Payment confirmed',
+            'payment' => $payment,
+            'affected_bookings_count' => $conflictSummary['count'],
+            'affected_booking_ids' => $conflictSummary['ids'],
+        ]);
     }
 
     /**
@@ -289,17 +324,27 @@ class BookingController extends Controller
         $existingReturn = $booking->vehicleReturn;
 
         // Calculate late fee if not provided
-        $lateFee = $validated['late_fee'] ?? 0;
+        $lateFee = isset($validated['late_fee']) ? (float) $validated['late_fee'] : 0.0;
         $scheduledEnd = \Carbon\Carbon::parse($booking->end_date);
         $actualReturn = isset($validated['returned_at']) ? \Carbon\Carbon::parse($validated['returned_at']) : now();
         if ($actualReturn->greaterThan($scheduledEnd)) {
             $hoursLate = $scheduledEnd->diffInHours($actualReturn);
-            $lateFee = $lateFee ?: ($hoursLate * 100); // ₱100/hour late fee
+            $lateFee = $lateFee > 0 ? $lateFee : ($hoursLate * 100); // ₱100/hour late fee fallback
         }
 
+        $damageFee = isset($validated['damage_fee'])
+            ? (float) $validated['damage_fee']
+            : ($existingReturn?->damage_fee ?? 0.0);
+        $cleaningFee = isset($validated['cleaning_fee'])
+            ? (float) $validated['cleaning_fee']
+            : ($existingReturn?->cleaning_fee ?? 0.0);
+
+        $fuelLevelForCalculation = $validated['fuel_level'] ?? ($existingReturn?->fuel_level ?? null);
+        $fuelFee = $this->calculateFuelShortageFee($booking, $fuelLevelForCalculation);
+
         // Calculate deposit refund amount if not provided
-        $depositAmount = $booking->vehicle->deposit ?? 0;
-        $totalFees = $lateFee + ($validated['damage_fee'] ?? 0) + ($validated['cleaning_fee'] ?? 0);
+        $depositAmount = (float) ($booking->vehicle->deposit ?? 0);
+        $totalFees = $lateFee + $damageFee + $cleaningFee + $fuelFee;
         $defaultRefundAmount = max(0, $depositAmount - $totalFees);
         
         $depositData = [];
@@ -320,6 +365,9 @@ class BookingController extends Controller
             $existingReturn->update(array_merge($validated, $depositData, [
                 'returned_at' => $validated['returned_at'] ?? $existingReturn->returned_at,
                 'late_fee' => $lateFee,
+                'damage_fee' => $damageFee,
+                'cleaning_fee' => $cleaningFee,
+                'fuel_fee' => $fuelFee,
                 'status' => 'completed',
                 'admin_processed_at' => now(),
             ]));
@@ -330,6 +378,9 @@ class BookingController extends Controller
                 'vehicle_id' => $booking->vehicle_id,
                 'returned_at' => $validated['returned_at'] ?? now(),
                 'late_fee' => $lateFee,
+                'damage_fee' => $damageFee,
+                'cleaning_fee' => $cleaningFee,
+                'fuel_fee' => $fuelFee,
                 'status' => 'completed',
                 'admin_processed_at' => now(),
                 'deposit_status' => $validated['deposit_status'] ?? 'pending',
@@ -358,9 +409,10 @@ class BookingController extends Controller
             'vehicle_name' => $booking->vehicle->name ?? 'Vehicle',
             'booking_id' => $booking->id,
             'late_fee' => $lateFee,
-            'damage_fee' => $validated['damage_fee'] ?? 0,
-            'cleaning_fee' => $validated['cleaning_fee'] ?? 0,
-            'total_additional_fees' => $lateFee + ($validated['damage_fee'] ?? 0) + ($validated['cleaning_fee'] ?? 0)
+            'damage_fee' => $damageFee,
+            'cleaning_fee' => $cleaningFee,
+            'fuel_fee' => $fuelFee,
+            'total_additional_fees' => $totalFees,
         ];
 
         // Add deposit refund information to notification
@@ -404,8 +456,9 @@ class BookingController extends Controller
         }
 
         // Calculate default refund amount if not provided
-        $depositAmount = $booking->vehicle->deposit ?? 0;
-        $totalFees = ($vehicleReturn->late_fee ?? 0) + ($vehicleReturn->damage_fee ?? 0) + ($vehicleReturn->cleaning_fee ?? 0);
+    $depositAmount = (float) ($booking->vehicle->deposit ?? 0);
+    $fuelFee = (float) ($vehicleReturn->fuel_fee ?? 0);
+    $totalFees = ($vehicleReturn->late_fee ?? 0) + ($vehicleReturn->damage_fee ?? 0) + ($vehicleReturn->cleaning_fee ?? 0) + $fuelFee;
         $defaultRefundAmount = max(0, $depositAmount - $totalFees);
 
         $updateData = [
@@ -436,6 +489,8 @@ class BookingController extends Controller
                 'refund_method' => $validated['refund_method'] ?? null,
                 'booking_id' => $booking->id,
                 'vehicle_name' => $booking->vehicle->name ?? 'Vehicle',
+                'fuel_fee' => $fuelFee,
+                'total_deductions' => $totalFees,
             ]
         );
 
@@ -446,12 +501,267 @@ class BookingController extends Controller
     }
 
     /**
+     * Cancel bookings that overlap with the confirmed booking and notify affected parties.
+     */
+    protected function cancelConflictingBookings(Booking $booking): array
+    {
+        if (!$booking->vehicle_id || !$booking->start_date || !$booking->end_date) {
+            return ['count' => 0, 'ids' => []];
+        }
+
+        $booking->loadMissing('vehicle');
+
+        $conflictingBookings = Booking::with(['user', 'vehicle', 'payments'])
+            ->where('vehicle_id', $booking->vehicle_id)
+            ->where('id', '<>', $booking->id)
+            ->whereIn('status', ['pending', 'confirmed', 'for_release'])
+            ->where(function ($query) use ($booking) {
+                $query->where('start_date', '<', $booking->end_date)
+                    ->where('end_date', '>', $booking->start_date);
+            })
+            ->get();
+
+        if ($conflictingBookings->isEmpty()) {
+            return ['count' => 0, 'ids' => []];
+        }
+
+        $cancelledBookings = collect();
+        $allCancelledPaymentIds = collect();
+        foreach ($conflictingBookings as $conflict) {
+            $conflict->status = 'cancelled';
+            $conflict->cancelled_at = now();
+            $conflict->cancellation_reason = 'Automatically cancelled due to another booking being confirmed for the same vehicle and schedule.';
+
+            $cancelledPaymentIds = [];
+            $conflict->payments
+                ->where('status', 'pending')
+                ->each(function ($payment) use (&$cancelledPaymentIds, $allCancelledPaymentIds) {
+                    $payment->status = 'rejected';
+                    $payment->approved_at = null;
+                    $payment->save();
+
+                    $cancelledPaymentIds[] = $payment->id;
+                    $allCancelledPaymentIds->push($payment->id);
+                });
+
+            $depositAmount = $conflict->vehicle ? (float) $conflict->vehicle->deposit : 0.0;
+            $hasRefundablePayments = $conflict->payments
+                ->whereIn('status', ['approved', 'rejected'])
+                ->isNotEmpty();
+
+            if ($depositAmount > 0 && $hasRefundablePayments) {
+                $conflict->refund_rate = 1.0;
+                $conflict->refund_amount = $depositAmount;
+                $conflict->refund_status = 'pending';
+            } else {
+                $conflict->refund_rate = null;
+                $conflict->refund_amount = 0;
+                $conflict->refund_status = 'not_applicable';
+            }
+
+            $conflict->save();
+            $cancelledBookings->push($conflict);
+
+            if ($conflict->user_id) {
+                $vehicleName = $conflict->vehicle->name ?? ($conflict->vehicle->model ?? 'Vehicle');
+                $this->notificationService->notifyUser(
+                    $conflict->user_id,
+                    'booking_cancelled_due_to_conflict',
+                    $conflict,
+                    [
+                        'message' => 'Your booking has been cancelled because another booking for the same vehicle and schedule was confirmed.',
+                        'booking_id' => $conflict->id,
+                        'vehicle_name' => $vehicleName,
+                        'start_date' => $conflict->start_date,
+                        'end_date' => $conflict->end_date,
+                        'conflicting_booking_id' => $booking->id,
+                        'requires_refund_details' => $conflict->refund_status === 'pending',
+                        'cancelled_payment_ids' => $cancelledPaymentIds,
+                        'cancelled_payments_count' => count($cancelledPaymentIds),
+                    ]
+                );
+            }
+        }
+
+        if ($cancelledBookings->isNotEmpty()) {
+            $vehicleName = $booking->vehicle->name ?? ($booking->vehicle->model ?? 'Vehicle');
+            $this->notificationService->notifyAdmins(
+                'booking_conflict_auto_cancelled',
+                $booking,
+                [
+                    'message' => sprintf('%d booking(s) were auto-cancelled due to a confirmed booking conflict.', $cancelledBookings->count()),
+                    'booking_id' => $booking->id,
+                    'vehicle_id' => $booking->vehicle_id,
+                    'vehicle_name' => $vehicleName,
+                    'affected_booking_ids' => $cancelledBookings->pluck('id')->values()->all(),
+                    'cancelled_payment_ids' => $allCancelledPaymentIds->values()->all(),
+                ]
+            );
+        }
+
+        return [
+            'count' => $cancelledBookings->count(),
+            'ids' => $cancelledBookings->pluck('id')->values()->all(),
+        ];
+    }
+
+    protected function calculateFuelShortageFee(Booking $booking, ?string $fuelLevel): float
+    {
+        $vehicle = $booking->vehicle;
+        if (!$vehicle) {
+            return 0.0;
+        }
+
+        $capacity = (float) ($vehicle->fuel_capacity ?? 0);
+        $penaltyPerLiter = (float) ($vehicle->gasoline_late_fee_per_liter ?? 0);
+
+        if ($capacity <= 0 || $penaltyPerLiter <= 0) {
+            return 0.0;
+        }
+
+        $fractionFilled = $this->parseFuelLevelFraction($fuelLevel);
+        $missingFraction = max(0.0, 1.0 - $fractionFilled);
+
+        if ($missingFraction <= 0) {
+            return 0.0;
+        }
+
+        $missingLiters = $capacity * $missingFraction;
+
+        return round($missingLiters * $penaltyPerLiter, 2);
+    }
+
+    protected function parseFuelLevelFraction(?string $value): float
+    {
+        if ($value === null) {
+            return 1.0;
+        }
+
+        $normalized = strtolower(trim($value));
+
+        if ($normalized === '') {
+            return 1.0;
+        }
+
+        $normalized = str_replace(['tank', 'level', 'fuel'], '', $normalized);
+        $normalized = trim(str_replace('-', ' ', $normalized));
+
+        $map = [
+            'empty' => 0.0,
+            '0' => 0.0,
+            '0%' => 0.0,
+            'quarter' => 0.25,
+            'a quarter' => 0.25,
+            'one quarter' => 0.25,
+            '1/4' => 0.25,
+            '25%' => 0.25,
+            'half' => 0.5,
+            'a half' => 0.5,
+            'one half' => 0.5,
+            '1/2' => 0.5,
+            '50%' => 0.5,
+            'three quarters' => 0.75,
+            'three quarter' => 0.75,
+            'three fourths' => 0.75,
+            'three fourth' => 0.75,
+            '3/4' => 0.75,
+            '75%' => 0.75,
+            'full' => 1.0,
+            '1' => 1.0,
+            '100%' => 1.0,
+        ];
+
+        if (array_key_exists($normalized, $map)) {
+            return $map[$normalized];
+        }
+
+        if (preg_match('/^(\d+)\s*\/\s*(\d+)$/', $normalized, $matches) === 1) {
+            $numerator = (float) $matches[1];
+            $denominator = (float) $matches[2];
+            if ($denominator > 0) {
+                return min(1.0, max(0.0, $numerator / $denominator));
+            }
+        }
+
+        if (substr($normalized, -1) === '%') {
+            $percent = (float) rtrim($normalized, '%');
+            return min(1.0, max(0.0, $percent / 100));
+        }
+
+        if (is_numeric($normalized)) {
+            $numeric = (float) $normalized;
+            if ($numeric > 1) {
+                $numeric = $numeric > 100 ? 1.0 : $numeric / 100;
+            }
+
+            return min(1.0, max(0.0, $numeric));
+        }
+
+        return 1.0;
+    }
+
+    /**
+     * Calculate late fee details for a booking using vehicle rates and return timestamps.
+     */
+    protected function calculateLateFeeDetails(Booking $booking): array
+    {
+        $scheduledEnd = $booking->end_date ? Carbon::parse($booking->end_date) : null;
+        $vehicleReturn = $booking->vehicleReturn;
+        $actualReturn = ($vehicleReturn && $vehicleReturn->returned_at)
+            ? Carbon::parse($vehicleReturn->returned_at)
+            : null;
+
+        if (!$scheduledEnd || !$actualReturn || $actualReturn->lessThanOrEqualTo($scheduledEnd)) {
+            return [
+                'amount' => '0.00',
+                'late_minutes_total' => 0,
+                'late_days' => 0,
+                'late_hours' => 0,
+                'remaining_minutes' => 0,
+                'half_hour_applied' => false,
+            ];
+        }
+
+        $minutesLate = $scheduledEnd->diffInMinutes($actualReturn);
+
+        $vehicle = $booking->vehicle;
+        $lateFeePerHour = $vehicle ? (float) $vehicle->late_fee_per_hour : 0.0;
+        $lateFeePerDay = $vehicle ? (float) $vehicle->late_fee_per_day : 0.0;
+
+        $daysLate = intdiv($minutesLate, 1440);
+        $remainingMinutes = $minutesLate % 1440;
+        $hoursLate = intdiv($remainingMinutes, 60);
+        $minutesOverflow = $remainingMinutes % 60;
+
+        $halfHourApplied = false;
+        $halfHourFee = 0.0;
+        if ($minutesOverflow >= 30) {
+            $halfHourFee = $lateFeePerHour / 2;
+            $halfHourApplied = true;
+        }
+
+        $totalLateFee = ($daysLate * $lateFeePerDay) + ($hoursLate * $lateFeePerHour) + $halfHourFee;
+
+        return [
+            'amount' => number_format($totalLateFee, 2, '.', ''),
+            'late_minutes_total' => $minutesLate,
+            'late_days' => $daysLate,
+            'late_hours' => $hoursLate,
+            'remaining_minutes' => $minutesOverflow,
+            'half_hour_applied' => $halfHourApplied,
+        ];
+    }
+
+    /**
      * Show a specific booking with all details for admin
      */
     public function show(Booking $booking)
     {
         $booking->load(['user', 'vehicle', 'payments', 'vehicleRelease', 'vehicleReturn', 'driver']);
         $data = $booking->toArray();
+        $lateFeeDetails = $this->calculateLateFeeDetails($booking);
+        $data['calculated_late_fee'] = $lateFeeDetails['amount'];
+        $data['late_fee_details'] = $lateFeeDetails;
         // Attach driver info if present
         if ($booking->driver) {
             $data['driver'] = [
@@ -554,10 +864,13 @@ class BookingController extends Controller
             return response()->json(['message' => 'Refund not available for processing'], 422);
         }
 
-        // Check if there are approved payments for this booking
-        $approvedPayments = $booking->payments()->where('status', 'approved')->get();
-        if ($approvedPayments->isEmpty()) {
-            return response()->json(['message' => 'No approved payments found for this booking. Refund cannot be processed.'], 422);
+        // Check if there are payments eligible for refund (approved or rejected submissions)
+        $eligiblePayments = $booking->payments()
+            ->whereIn('status', ['approved', 'rejected'])
+            ->get();
+
+        if ($eligiblePayments->isEmpty()) {
+            return response()->json(['message' => 'No payments eligible for refund were found for this booking.'], 422);
         }
 
         // Update refund status with admin-specified amount
@@ -580,7 +893,7 @@ class BookingController extends Controller
                 'refund_amount' => $booking->refund_amount,
                 'refund_notes' => $booking->refund_notes,
                 'processed_at' => now(),
-                'approved_payments_count' => $approvedPayments->count(),
+                'eligible_payments_count' => $eligiblePayments->count(),
             ]
         );
 
