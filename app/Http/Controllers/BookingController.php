@@ -88,6 +88,7 @@ class BookingController extends Controller
             'customer_condition_notes' => 'nullable|string|max:1000',
             'odometer' => 'nullable|integer|min:0',
             'fuel_level' => 'nullable|string|max:50',
+            'returned_at' => 'nullable|date',
             // Customer refund account information
             'customer_refund_method' => 'required|string|in:gcash,bank_transfer,cash',
             'customer_account_number' => 'nullable|string|max:50',
@@ -122,7 +123,7 @@ class BookingController extends Controller
             'fuel_level' => $validated['fuel_level'] ?? null,
             'status' => 'customer_submitted',
             'customer_submitted_at' => now(),
-            'returned_at' => now(), // Initial return timestamp
+            'returned_at' => $validated['returned_at'] ?? now(),
             // Customer refund account information
             'customer_refund_method' => $validated['customer_refund_method'],
             'customer_account_number' => $validated['customer_account_number'] ?? null,
