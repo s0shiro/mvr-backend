@@ -35,7 +35,7 @@ class DriverService
     {
         $driver = Driver::findOrFail($id);
         $driver->update($data);
-        return $driver;
+        return $driver->fresh();
     }
 
     public function delete($id)
