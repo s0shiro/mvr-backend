@@ -625,6 +625,11 @@ class BookingController extends Controller
                 'late_fee' => $return->late_fee,
                 'damage_fee' => $return->damage_fee,
                 'cleaning_fee' => $return->cleaning_fee,
+                'deposit_status' => $return->deposit_status,
+                'deposit_refund_amount' => $return->deposit_refund_amount,
+                'deposit_refund_notes' => $return->deposit_refund_notes,
+                'deposit_refund_proof' => $return->deposit_refund_proof,
+                'refund_method' => $return->refund_method,
             ] : null,
         ];
         return response()->json(['completed_booking_summary' => $response]);
